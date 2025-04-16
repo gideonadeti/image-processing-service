@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Image Processing Service')
-    .setDescription('')
+    .setDescription('A service that allows users to upload and process images.')
     .setVersion('1.0.0')
     .build();
 
