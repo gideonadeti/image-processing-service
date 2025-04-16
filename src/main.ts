@@ -1,3 +1,4 @@
+import * as cookieParser from 'cookie-parser';
 import { NestFactory } from '@nestjs/core';
 import {
   DocumentBuilder,
@@ -11,12 +12,16 @@ import metadata from './metadata';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.use(cookieParser());
+
   await SwaggerModule.loadPluginMetadata(metadata);
 
   const config = new DocumentBuilder()
     .setTitle('Image Processing Service')
     .setDescription('A service that allows users to upload and process images.')
     .setVersion('1.0.0')
+    .addBearerAuth()
+    .addTag('Auth')
     .build();
 
   const options: SwaggerDocumentOptions = {
