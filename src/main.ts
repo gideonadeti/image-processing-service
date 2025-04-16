@@ -6,9 +6,12 @@ import {
 } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
+import metadata from './metadata';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  await SwaggerModule.loadPluginMetadata(metadata);
 
   const config = new DocumentBuilder()
     .setTitle('Image Processing Service')
