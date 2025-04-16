@@ -11,8 +11,6 @@
           "introspectComments": true
         }
       }
-    ],
-    "builder": "swc",
-    "typeCheck": true
+    ]
   }
 }
