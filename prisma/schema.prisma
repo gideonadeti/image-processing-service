@@ -40,5 +40,38 @@ model Image {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transformedImages TransformedImage[]
+}
+
+model TransformedImage {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  originalImageId String   @db.ObjectId
+  key             String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  originalImage  Image           @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
+  transformation Transformation?
+}
+
+model Transformation {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  transformedImageId String   @unique @db.ObjectId
+  width              Int?
+  height             Int?
+  quality            Int?
+  grayscale          Boolean?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  format           TransformationFormat?
+  transformedImage TransformedImage      @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
+}
+
+enum TransformationFormat {
+  jpeg
+  png
+  webp
+  avif
 }
