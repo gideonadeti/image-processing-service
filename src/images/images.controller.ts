@@ -21,6 +21,7 @@ import { ImagesService } from './images.service';
 import { UpdateImageDto } from './dto/update-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
+import { FindAllProductsDto } from './dto/find-all-images.dto';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -49,8 +50,8 @@ export class ImagesController {
   }
 
   @Get()
-  findAll(@UserId() userId: string) {
-    return this.imagesService.findAll(userId);
+  findAll(@UserId() userId: string, @Query() query: FindAllProductsDto) {
+    return this.imagesService.findAll(userId, query);
   }
 
   @Get(':id')

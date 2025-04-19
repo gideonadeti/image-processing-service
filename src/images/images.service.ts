@@ -9,6 +9,7 @@ import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
+import { FindAllProductsDto } from './dto/find-all-images.dto';
 
 @Injectable()
 export class ImagesService {
@@ -63,28 +64,83 @@ export class ImagesService {
     }
   }
 
-  async findAll(userId: string) {
-    try {
-      const images = await this.prismaService.image.findMany({
-        where: {
-          userId,
-        },
-        select: {
-          id: true,
-          userId: true,
-          originalName: true,
-          size: true,
-          format: true,
-          key: false,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+  async findAll(userId: string, query: FindAllProductsDto) {
+    const { originalName, minSize, maxSize, sortBy, order, limit, page } =
+      query;
 
-      return images.map((image) => ({
+    const whereConditions: any = {};
+
+    if (originalName) {
+      whereConditions.originalName = {
+        contains: originalName,
+        mode: 'insensitive',
+      };
+    }
+
+    if (minSize !== undefined || maxSize !== undefined) {
+      whereConditions.size = {};
+
+      if (minSize !== undefined) {
+        whereConditions.size.gte = Number(minSize) * 1024 * 1024; // Convert MB to bytes
+      }
+      if (maxSize !== undefined) {
+        whereConditions.size.lte = Number(maxSize) * 1024 * 1024;
+      }
+    }
+
+    try {
+      if (!page && !limit) {
+        const images = await this.prismaService.image.findMany({
+          where: {
+            userId,
+          },
+          select: {
+            id: true,
+            userId: true,
+            originalName: true,
+            size: true,
+            format: true,
+            key: false,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        return images.map((image) => ({
+          ...image,
+          url: this.baseUrl + '/images/' + image.id + '/view',
+        }));
+      }
+
+      const numberPage = page ? Number(page) : 1;
+      const numberLimit = limit ? Number(limit) : 10;
+      const total = await this.prismaService.image.count({
+        where: whereConditions,
+      });
+      const lastPage = Math.ceil(total / numberLimit);
+      const images = await this.prismaService.image.findMany({
+        where: whereConditions,
+        orderBy: {
+          [sortBy]: order,
+        },
+        skip: (numberPage - 1) * numberLimit,
+        take: numberLimit,
+      });
+      const imagesWithUrl = images.map((image) => ({
         ...image,
         url: this.baseUrl + '/images/' + image.id + '/view',
       }));
+
+      return {
+        imagesWithUrl,
+        meta: {
+          total,
+          page: numberPage,
+          lastPage,
+          hasNextPage: numberPage < lastPage,
+          hasPreviousPage: numberPage > 1,
+        },
+      };
     } catch (error) {
       this.handleError(error, `'fetch images for user with ID ${userId}'`);
     }
