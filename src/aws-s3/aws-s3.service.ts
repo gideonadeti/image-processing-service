@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 import {
   S3Client,
   PutObjectCommand,
@@ -57,6 +58,6 @@ export class AwsS3Service {
     });
     const response = await this.s3.send(command);
 
-    return response.Body as NodeJS.ReadableStream;
+    return response.Body as Readable;
   }
 }
