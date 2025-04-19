@@ -19,6 +19,7 @@ async function bootstrap() {
     .setVersion('1.0.0')
     .addBearerAuth()
     .addTag('Auth')
+    .addTag('Images')
     .build();
 
   const options: SwaggerDocumentOptions = {
