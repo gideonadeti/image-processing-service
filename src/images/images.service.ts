@@ -120,7 +120,29 @@ export class ImagesService {
     return `This action updates a #${id} image`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} image`;
+  async remove(id: string) {
+    try {
+      const image = await this.prismaService.image.delete({
+        where: {
+          id,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      await this.awsS3Service.deleteFile(image.key);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key, ...rest } = image;
+
+      return {
+        ...rest,
+        url: this.baseUrl + '/images/' + image.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, `delete image with ID ${id}`);
+    }
   }
 }
