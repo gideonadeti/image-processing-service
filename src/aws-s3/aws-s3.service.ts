@@ -57,6 +57,6 @@ export class AwsS3Service {
     });
     const response = await this.s3.send(command);
 
-    return response.Body;
+    return response.Body as NodeJS.ReadableStream;
   }
 }

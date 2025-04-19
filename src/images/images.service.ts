@@ -8,6 +8,7 @@ import { UpdateImageDto } from './dto/update-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 
 @Injectable()
 export class ImagesService {
@@ -114,6 +115,38 @@ export class ImagesService {
       ...image,
       url: this.baseUrl + '/images/' + image.id + '/view',
     };
+  }
+
+  async viewOrDownload(id: string, res: Response, download?: string) {
+    const image = await this.prismaService.image.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        key: true,
+        format: true,
+        originalName: true,
+      },
+    });
+
+    if (!image) {
+      throw new BadRequestException(`Image with ID ${id} not found`);
+    }
+
+    const stream = await this.awsS3Service.getFileStream(image.key);
+
+    res.setHeader('Content-Type', 'image/' + image.format);
+
+    if (download === 'true') {
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${image.originalName}"`,
+      );
+    } else {
+      res.setHeader('Content-Disposition', 'inline');
+    }
+
+    stream.pipe(res);
   }
 
   update(id: number, updateImageDto: UpdateImageDto) {
