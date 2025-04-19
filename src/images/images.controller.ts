@@ -46,8 +46,8 @@ export class ImagesController {
   }
 
   @Get()
-  findAll() {
-    return this.imagesService.findAll();
+  findAll(@UserId() userId: string) {
+    return this.imagesService.findAll(userId);
   }
 
   @Get(':id')

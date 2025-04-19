@@ -41,13 +41,20 @@ export class ImagesService {
           format,
           key,
         },
+        select: {
+          id: true,
+          userId: true,
+          originalName: true,
+          size: true,
+          format: true,
+          key: false,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: imageKey, ...rest } = image;
-
       return {
-        ...rest,
+        ...image,
         url: this.baseUrl + '/images/' + image.id + '/view',
       };
     } catch (error) {
@@ -55,8 +62,31 @@ export class ImagesService {
     }
   }
 
-  findAll() {
-    return `This action returns all images`;
+  async findAll(userId: string) {
+    try {
+      const images = await this.prismaService.image.findMany({
+        where: {
+          userId,
+        },
+        select: {
+          id: true,
+          userId: true,
+          originalName: true,
+          size: true,
+          format: true,
+          key: false,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return images.map((image) => ({
+        ...image,
+        url: this.baseUrl + '/images/' + image.id + '/view',
+      }));
+    } catch (error) {
+      this.handleError(error, `'fetch images for user with ID ${userId}'`);
+    }
   }
 
   findOne(id: number) {
