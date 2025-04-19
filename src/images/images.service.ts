@@ -89,8 +89,31 @@ export class ImagesService {
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} image`;
+  async findOne(id: string) {
+    const image = await this.prismaService.image.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        userId: true,
+        originalName: true,
+        size: true,
+        format: true,
+        key: false,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!image) {
+      throw new BadRequestException(`Image with ID ${id} not found`);
+    }
+
+    return {
+      ...image,
+      url: this.baseUrl + '/images/' + image.id + '/view',
+    };
   }
 
   update(id: number, updateImageDto: UpdateImageDto) {

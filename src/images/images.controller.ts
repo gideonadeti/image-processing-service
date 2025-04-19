@@ -52,7 +52,7 @@ export class ImagesController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.imagesService.findOne(+id);
+    return this.imagesService.findOne(id);
   }
 
   @Patch(':id')
