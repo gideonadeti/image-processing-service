@@ -1,4 +1,5 @@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   Controller,
   Get,
@@ -8,10 +9,12 @@ import {
   Param,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipeBuilder,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
-import { CreateImageDto } from './dto/create-image.dto';
 import { UpdateImageDto } from './dto/update-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
@@ -23,8 +26,21 @@ export class ImagesController {
   constructor(private readonly imagesService: ImagesService) {}
 
   @Post()
-  create(@Body() createImageDto: CreateImageDto) {
-    return this.imagesService.create(createImageDto);
+  @UseInterceptors(FileInterceptor('file'))
+  create(
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: 'image/*',
+        })
+        .addMaxSizeValidator({
+          maxSize: 1024 * 1024 * 10, // 10MB
+        })
+        .build(),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.imagesService.create(file);
   }
 
   @Get()
