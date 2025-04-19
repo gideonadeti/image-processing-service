@@ -17,6 +17,7 @@ import {
 import { ImagesService } from './images.service';
 import { UpdateImageDto } from './dto/update-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { UserId } from 'src/user-id/user-id.decorator';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class ImagesController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   create(
+    @UserId() userId: string,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
@@ -40,7 +42,7 @@ export class ImagesController {
     )
     file: Express.Multer.File,
   ) {
-    return this.imagesService.create(file);
+    return this.imagesService.create(userId, file);
   }
 
   @Get()
