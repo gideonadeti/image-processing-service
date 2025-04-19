@@ -1,5 +1,7 @@
+import * as sharp from 'sharp';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -10,6 +12,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { FindAllProductsDto } from './dto/find-all-images.dto';
+import { TransformImageDto } from './dto/transform-image.dto';
 
 @Injectable()
 export class ImagesService {
@@ -26,10 +29,46 @@ export class ImagesService {
 
     if (error instanceof BadRequestException) {
       throw error;
+    } else if (error instanceof ForbiddenException) {
+      throw error;
     }
 
     throw new InternalServerErrorException(`Failed to ${action}`);
   }
+
+  private transformImage = async (
+    imageBuffer: Buffer,
+    transformImageDto: TransformImageDto,
+  ) => {
+    let transformedImage = sharp(imageBuffer);
+
+    // Resize
+    if (transformImageDto.resize) {
+      if (transformImageDto.resize.width)
+        transformedImage = transformedImage.resize(
+          transformImageDto.resize.width,
+        );
+      if (transformImageDto.resize.height)
+        transformedImage = transformedImage.resize(
+          transformImageDto.resize.height,
+        );
+    }
+
+    // Format
+    if (transformImageDto.format) {
+      transformedImage = transformedImage.toFormat(transformImageDto.format, {
+        quality: transformImageDto.quality,
+      });
+    }
+
+    // Grayscale
+    if (transformImageDto.grayscale) {
+      transformedImage = transformedImage.grayscale();
+    }
+
+    // 3. Final transformed image buffer
+    return await transformedImage.toBuffer();
+  };
 
   async create(userId: string, file: Express.Multer.File) {
     const format = file.mimetype.split('/')[1];
@@ -61,6 +100,86 @@ export class ImagesService {
       };
     } catch (error) {
       this.handleError(error, 'upload image');
+    }
+  }
+
+  async transform(
+    userId: string,
+    id: string,
+    transformImageDto: TransformImageDto,
+  ) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
+
+      if (image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to transform this image',
+        );
+      }
+
+      const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
+      const transformedImageBuffer = await this.transformImage(
+        imageBuffer,
+        transformImageDto,
+      );
+      const expressMulterFile = {
+        buffer: transformedImageBuffer,
+        originalname: image.originalName,
+        mimetype: `image/${transformImageDto.format}`,
+      } as Express.Multer.File;
+      const key = await this.awsS3Service.uploadFile(
+        expressMulterFile,
+        `${userId}/transformations`,
+      );
+      const transformedImage = await this.prismaService.transformedImage.create(
+        {
+          data: {
+            originalImageId: image.id,
+            key,
+            transformation: {
+              create: {
+                width: transformImageDto.resize?.width,
+                height: transformImageDto.resize?.height,
+                quality: transformImageDto.quality,
+                grayscale: transformImageDto.grayscale,
+                format: transformImageDto.format,
+              },
+            },
+          },
+          select: {
+            id: true,
+            originalImageId: true,
+            key: false,
+            createdAt: true,
+            updatedAt: true,
+            transformation: {
+              select: {
+                width: true,
+                height: true,
+                quality: true,
+                grayscale: true,
+                format: true,
+              },
+            },
+          },
+        },
+      );
+
+      return {
+        ...transformedImage,
+        url:
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, 'transform image');
     }
   }
 

@@ -22,6 +22,7 @@ import { UpdateImageDto } from './dto/update-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { FindAllProductsDto } from './dto/find-all-images.dto';
+import { TransformImageDto } from './dto/transform-image.dto';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -47,6 +48,15 @@ export class ImagesController {
     file: Express.Multer.File,
   ) {
     return this.imagesService.create(userId, file);
+  }
+
+  @Post(':id/transform')
+  transform(
+    @UserId() userId: string,
+    @Param('id') id: string,
+    @Body() transformImageDto: TransformImageDto,
+  ) {
+    return this.imagesService.transform(userId, id, transformImageDto);
   }
 
   @Get()

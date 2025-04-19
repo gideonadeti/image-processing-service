@@ -38,6 +38,7 @@
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

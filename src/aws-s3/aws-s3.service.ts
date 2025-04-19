@@ -60,4 +60,20 @@ export class AwsS3Service {
 
     return response.Body as Readable;
   }
+
+  async getFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    const response = await this.s3.send(command);
+    const readable = response.Body as Readable;
+
+    return new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      readable.on('data', (chunk: Buffer) => chunks.push(chunk));
+      readable.on('end', () => resolve(Buffer.concat(chunks)));
+      readable.on('error', reject);
+    });
+  }
 }
