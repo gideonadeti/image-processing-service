@@ -44,14 +44,22 @@ export class ImagesService {
 
     // Resize
     if (transformImageDto.resize) {
-      if (transformImageDto.resize.width)
-        transformedImage = transformedImage.resize(
-          transformImageDto.resize.width,
-        );
-      if (transformImageDto.resize.height)
-        transformedImage = transformedImage.resize(
-          transformImageDto.resize.height,
-        );
+      const { width, height } = transformImageDto.resize;
+
+      if (width && height) {
+        transformedImage = transformedImage.resize({
+          width,
+          height,
+        });
+      } else if (width) {
+        transformedImage = transformedImage.resize({
+          width,
+        });
+      } else if (height) {
+        transformedImage = transformedImage.resize({
+          height,
+        });
+      }
     }
 
     // Format
