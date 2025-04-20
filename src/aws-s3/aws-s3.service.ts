@@ -43,12 +43,12 @@ export class AwsS3Service {
   }
 
   async deleteFile(key: string) {
-    await this.s3.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      }),
-    );
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    await this.s3.send(command);
   }
 
   async getFileStream(key: string) {
@@ -69,7 +69,7 @@ export class AwsS3Service {
     const response = await this.s3.send(command);
     const readable = response.Body as Readable;
 
-    return new Promise<Buffer>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       readable.on('data', (chunk: Buffer) => chunks.push(chunk));
       readable.on('end', () => resolve(Buffer.concat(chunks)));
