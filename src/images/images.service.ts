@@ -1,15 +1,19 @@
+import * as sharp from 'sharp';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
 
-import { UpdateImageDto } from './dto/update-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { FindAllProductsDto } from './dto/find-all-images.dto';
+import { FindAllImagesDto } from './dto/find-all-images.dto';
+import { TransformImageDto } from './dto/transform-image.dto';
+import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
+import { InputJsonObject } from 'generated/prisma/runtime/library';
 
 @Injectable()
 export class ImagesService {
@@ -26,10 +30,78 @@ export class ImagesService {
 
     if (error instanceof BadRequestException) {
       throw error;
+    } else if (error instanceof ForbiddenException) {
+      throw error;
     }
 
     throw new InternalServerErrorException(`Failed to ${action}`);
   }
+
+  private transformImage = async (
+    imageBuffer: Buffer,
+    transformImageDto: TransformImageDto,
+  ) => {
+    let transformedImage = sharp(imageBuffer);
+
+    // Resize
+    if (transformImageDto.resize) {
+      const { width, height, fit } = transformImageDto.resize;
+
+      if (width && height) {
+        transformedImage = transformedImage.resize({
+          width,
+          height,
+          fit: fit || 'cover',
+        });
+      } else if (width) {
+        transformedImage = transformedImage.resize({
+          width,
+          fit: fit || 'cover',
+        });
+      } else if (height) {
+        transformedImage = transformedImage.resize({
+          height,
+          fit: fit || 'cover',
+        });
+      }
+    }
+
+    // Crop
+    if (transformImageDto.crop) {
+      const metadata = await transformedImage.metadata();
+      const { width: imgWidth, height: imgHeight } = metadata;
+      const { width, height, left, top } = transformImageDto.crop;
+
+      if (left + width > imgWidth || top + height > imgHeight) {
+        throw new BadRequestException('Crop area is out of bounds');
+      }
+
+      transformedImage = transformedImage.extract({
+        left,
+        top,
+        width,
+        height,
+      });
+    }
+
+    // Rotate
+    if (transformImageDto.rotate) {
+      transformedImage = transformedImage.rotate(transformImageDto.rotate);
+    }
+
+    // Grayscale
+    if (transformImageDto.grayscale) {
+      transformedImage = transformedImage.grayscale();
+    }
+
+    // Tint
+    if (transformImageDto.tint) {
+      transformedImage = transformedImage.tint(transformImageDto.tint);
+    }
+
+    // 3. Final transformed image buffer
+    return await transformedImage.toBuffer();
+  };
 
   async create(userId: string, file: Express.Multer.File) {
     const format = file.mimetype.split('/')[1];
@@ -64,7 +136,87 @@ export class ImagesService {
     }
   }
 
-  async findAll(userId: string, query: FindAllProductsDto) {
+  async transform(
+    userId: string,
+    id: string,
+    transformImageDto: TransformImageDto,
+  ) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
+
+      if (image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to transform this image',
+        );
+      }
+
+      const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
+      const transformedImageBuffer = await this.transformImage(
+        imageBuffer,
+        transformImageDto,
+      );
+      const expressMulterFile = {
+        buffer: transformedImageBuffer,
+        originalname: image.originalName,
+        mimetype: `image/${image.format}`,
+      } as Express.Multer.File;
+      const key = await this.awsS3Service.uploadFile(
+        expressMulterFile,
+        `${userId}/transformations`,
+      );
+      const transformedImage = await this.prismaService.transformedImage.create(
+        {
+          data: {
+            originalImageId: image.id,
+            key,
+            transformation: {
+              create: {
+                resize: transformImageDto.resize as InputJsonObject,
+                crop: transformImageDto.crop as unknown as InputJsonObject,
+                rotate: transformImageDto.rotate,
+                grayscale: transformImageDto.grayscale,
+                tint: transformImageDto.tint,
+              },
+            },
+          },
+          select: {
+            id: true,
+            originalImageId: true,
+            key: false,
+            createdAt: true,
+            updatedAt: true,
+            transformation: {
+              select: {
+                resize: true,
+                crop: true,
+                rotate: true,
+                grayscale: true,
+                tint: true,
+              },
+            },
+          },
+        },
+      );
+
+      return {
+        ...transformedImage,
+        url:
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, 'transform image');
+    }
+  }
+
+  async findAll(userId: string, query: FindAllImagesDto) {
     const { originalName, minSize, maxSize, sortBy, order, limit, page } =
       query;
 
@@ -173,7 +325,12 @@ export class ImagesService {
     };
   }
 
-  async viewOrDownload(id: string, res: Response, download?: string) {
+  async viewOrDownload(
+    id: string,
+    query: ViewOrDownloadImageDto,
+    res: Response,
+  ) {
+    const { download } = query;
     const image = await this.prismaService.image.findUnique({
       where: {
         id,
@@ -193,7 +350,7 @@ export class ImagesService {
 
     res.setHeader('Content-Type', 'image/' + image.format);
 
-    if (download === 'true') {
+    if (download) {
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${image.originalName}"`,
@@ -203,10 +360,6 @@ export class ImagesService {
     }
 
     stream.pipe(res);
-  }
-
-  update(id: number, updateImageDto: UpdateImageDto) {
-    return `This action updates a #${id} image`;
   }
 
   async remove(id: string) {

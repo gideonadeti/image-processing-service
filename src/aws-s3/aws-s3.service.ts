@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 import {
   S3Client,
   PutObjectCommand,
@@ -42,12 +43,12 @@ export class AwsS3Service {
   }
 
   async deleteFile(key: string) {
-    await this.s3.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      }),
-    );
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    await this.s3.send(command);
   }
 
   async getFileStream(key: string) {
@@ -57,6 +58,22 @@ export class AwsS3Service {
     });
     const response = await this.s3.send(command);
 
-    return response.Body as NodeJS.ReadableStream;
+    return response.Body as Readable;
+  }
+
+  async getFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    const response = await this.s3.send(command);
+    const readable = response.Body as Readable;
+
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      readable.on('data', (chunk: Buffer) => chunks.push(chunk));
+      readable.on('end', () => resolve(Buffer.concat(chunks)));
+      readable.on('error', reject);
+    });
   }
 }
