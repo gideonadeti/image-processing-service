@@ -20,10 +20,9 @@ export class TransformedImagesService {
   }
 
   async viewOrDownload(
-    userId: string,
     id: string,
-    res: Response,
     query: ViewOrDownloadImageDto,
+    res: Response,
   ) {
     const { download } = query;
     const transformedImage =

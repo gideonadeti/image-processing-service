@@ -302,8 +302,8 @@ export class ImagesService {
 
   async viewOrDownload(
     id: string,
-    res: Response,
     query: ViewOrDownloadImageDto,
+    res: Response,
   ) {
     const { download } = query;
     const image = await this.prismaService.image.findUnique({
