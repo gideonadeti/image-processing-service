@@ -58,9 +58,11 @@ model TransformedImage {
 model Transformation {
   id                 String   @id @default(auto()) @map("_id") @db.ObjectId
   transformedImageId String   @unique @db.ObjectId
-  width              Int?
-  height             Int?
+  resize             Json?
+  crop               Json?
+  rotate             Int?
   grayscale          Boolean?
+  tint               String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
