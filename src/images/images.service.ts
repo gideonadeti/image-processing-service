@@ -50,14 +50,17 @@ export class ImagesService {
         transformedImage = transformedImage.resize({
           width,
           height,
+          fit: transformImageDto.resize.fit || 'cover',
         });
       } else if (width) {
         transformedImage = transformedImage.resize({
           width,
+          fit: transformImageDto.resize.fit || 'cover',
         });
       } else if (height) {
         transformedImage = transformedImage.resize({
           height,
+          fit: transformImageDto.resize.fit || 'cover',
         });
       }
     }
