@@ -7,6 +7,9 @@ import {
   IsObject,
   IsPositive,
   IsIn,
+  IsDefined,
+  IsNumber,
+  Min,
 } from 'class-validator';
 
 export class ResizeOptions {
@@ -37,6 +40,42 @@ export class ResizeOptions {
   fit?: 'contain' | 'cover' | 'fill' | 'inside' | 'outside';
 }
 
+export class CropOptions {
+  /**
+   * Crop left position
+   * @example 100
+   */
+  @IsDefined()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  left: number;
+
+  /**
+   * Crop top position
+   * @example 50
+   */
+  @IsDefined()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  top: number;
+
+  /**
+   * Crop width
+   * @example 300
+   */
+  @IsDefined()
+  @IsPositive()
+  width: number;
+
+  /**
+   * Crop height
+   * @example 200
+   */
+  @IsDefined()
+  @IsPositive()
+  height: number;
+}
+
 export class TransformImageDto {
   /**
    * Resize options for the image
@@ -46,6 +85,16 @@ export class TransformImageDto {
   @ValidateNested()
   @Type(() => ResizeOptions)
   resize?: ResizeOptions;
+
+  /**
+   * Crop options for the image
+   * @example { "left": 100, "top": 50, "width": 300, "height": 200 }
+   */
+  @Type(() => CropOptions)
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  crop?: CropOptions;
 
   /**
    * Convert image to grayscale
