@@ -83,6 +83,11 @@ export class ImagesService {
       });
     }
 
+    // Rotate
+    if (transformImageDto.rotate) {
+      transformedImage = transformedImage.rotate(transformImageDto.rotate);
+    }
+
     // Grayscale
     if (transformImageDto.grayscale) {
       transformedImage = transformedImage.grayscale();
