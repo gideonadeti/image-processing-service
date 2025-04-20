@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsOptional,
-  IsInt,
   IsBoolean,
   ValidateNested,
   IsObject,
@@ -18,7 +17,6 @@ export class ResizeOptions {
    * @example 800
    */
   @IsOptional()
-  @IsInt()
   @IsPositive()
   width?: number;
 
@@ -27,7 +25,6 @@ export class ResizeOptions {
    * @example 600
    */
   @IsOptional()
-  @IsInt()
   @IsPositive()
   height?: number;
 
@@ -80,10 +77,10 @@ export class TransformImageDto {
   /**
    * Resize options for the image
    */
+  @Type(() => ResizeOptions)
   @IsOptional()
   @IsObject()
   @ValidateNested()
-  @Type(() => ResizeOptions)
   resize?: ResizeOptions;
 
   /**
