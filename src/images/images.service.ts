@@ -13,6 +13,7 @@ import { Response } from 'express';
 import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
+import { InputJsonObject } from 'generated/prisma/runtime/library';
 
 @Injectable()
 export class ImagesService {
@@ -178,9 +179,11 @@ export class ImagesService {
             key,
             transformation: {
               create: {
-                width: transformImageDto.resize?.width,
-                height: transformImageDto.resize?.height,
+                resize: transformImageDto.resize as InputJsonObject,
+                crop: transformImageDto.crop as unknown as InputJsonObject,
+                rotate: transformImageDto.rotate,
                 grayscale: transformImageDto.grayscale,
+                tint: transformImageDto.tint,
               },
             },
           },
@@ -192,9 +195,11 @@ export class ImagesService {
             updatedAt: true,
             transformation: {
               select: {
-                width: true,
-                height: true,
+                resize: true,
+                crop: true,
+                rotate: true,
                 grayscale: true,
+                tint: true,
               },
             },
           },
