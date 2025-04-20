@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsObject,
   IsPositive,
+  IsIn,
 } from 'class-validator';
 
 export class ResizeOptions {
@@ -26,6 +27,14 @@ export class ResizeOptions {
   @IsInt()
   @IsPositive()
   height?: number;
+
+  /**
+   * Resize fit mode
+   * @example contain
+   */
+  @IsOptional()
+  @IsIn(['contain', 'cover', 'fill', 'inside', 'outside'])
+  fit?: 'contain' | 'cover' | 'fill' | 'inside' | 'outside';
 }
 
 export class TransformImageDto {

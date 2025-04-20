@@ -64,5 +64,14 @@ model Transformation {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  transformedImage TransformedImage @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
+  transformedImage TransformedImage   @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
+  fit              TransformationFit?
+}
+
+enum TransformationFit {
+  cover
+  contain
+  fill
+  inside
+  outside
 }
