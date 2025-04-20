@@ -14,6 +14,7 @@ import {
   ParseFilePipeBuilder,
   Res,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
@@ -56,6 +57,20 @@ export class ImagesController {
     @Param('id') id: string,
     @Body() transformImageDto: TransformImageDto,
   ) {
+    const hasResize =
+      transformImageDto.resize &&
+      (transformImageDto.resize.width != null ||
+        transformImageDto.resize.height != null);
+    const hasFormat = transformImageDto.format != null;
+    const hasQuality = transformImageDto.quality != null;
+    const hasGrayscale = transformImageDto.grayscale != null;
+
+    if (!hasResize && !hasFormat && !hasQuality && !hasGrayscale) {
+      throw new BadRequestException(
+        'At least one valid transformation option must be provided.',
+      );
+    }
+
     return this.imagesService.transform(userId, id, transformImageDto);
   }
 
