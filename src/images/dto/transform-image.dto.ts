@@ -9,6 +9,7 @@ import {
   IsDefined,
   IsNumber,
   Min,
+  Max,
 } from 'class-validator';
 
 export class ResizeOptions {
@@ -92,6 +93,16 @@ export class TransformImageDto {
   @IsObject()
   @ValidateNested()
   crop?: CropOptions;
+
+  /**
+   * Rotate image in degrees
+   * @example 90
+   */
+  @IsOptional()
+  @IsNumber()
+  @Min(-360)
+  @Max(360)
+  rotate?: number;
 
   /**
    * Convert image to grayscale
