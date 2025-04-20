@@ -69,6 +69,16 @@ export class ImagesController {
       );
     }
 
+    const fit = transformImageDto.resize?.fit;
+    const width = transformImageDto.resize?.width;
+    const height = transformImageDto.resize?.height;
+
+    if (fit != null && width == null && height == null) {
+      throw new BadRequestException(
+        "If 'fit' is provided, either 'width' or 'height' must also be provided.",
+      );
+    }
+
     return this.imagesService.transform(userId, id, transformImageDto);
   }
 
