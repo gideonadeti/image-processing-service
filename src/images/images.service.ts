@@ -62,13 +62,6 @@ export class ImagesService {
       }
     }
 
-    // Format
-    if (transformImageDto.format) {
-      transformedImage = transformedImage.toFormat(transformImageDto.format, {
-        quality: transformImageDto.quality,
-      });
-    }
-
     // Grayscale
     if (transformImageDto.grayscale) {
       transformedImage = transformedImage.grayscale();
@@ -141,7 +134,7 @@ export class ImagesService {
       const expressMulterFile = {
         buffer: transformedImageBuffer,
         originalname: image.originalName,
-        mimetype: `image/${transformImageDto.format}`,
+        mimetype: `image/${image.format}`,
       } as Express.Multer.File;
       const key = await this.awsS3Service.uploadFile(
         expressMulterFile,
@@ -156,9 +149,7 @@ export class ImagesService {
               create: {
                 width: transformImageDto.resize?.width,
                 height: transformImageDto.resize?.height,
-                quality: transformImageDto.quality,
                 grayscale: transformImageDto.grayscale,
-                format: transformImageDto.format,
               },
             },
           },
@@ -172,9 +163,7 @@ export class ImagesService {
               select: {
                 width: true,
                 height: true,
-                quality: true,
                 grayscale: true,
-                format: true,
               },
             },
           },

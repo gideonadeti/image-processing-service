@@ -60,18 +60,9 @@ model Transformation {
   transformedImageId String   @unique @db.ObjectId
   width              Int?
   height             Int?
-  quality            Int?
   grayscale          Boolean?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  format           TransformationFormat?
-  transformedImage TransformedImage      @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
-}
-
-enum TransformationFormat {
-  jpeg
-  png
-  webp
-  avif
+  transformedImage TransformedImage @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
 }

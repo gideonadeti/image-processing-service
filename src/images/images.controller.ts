@@ -61,11 +61,9 @@ export class ImagesController {
       transformImageDto.resize &&
       (transformImageDto.resize.width != null ||
         transformImageDto.resize.height != null);
-    const hasFormat = transformImageDto.format != null;
-    const hasQuality = transformImageDto.quality != null;
     const hasGrayscale = transformImageDto.grayscale != null;
 
-    if (!hasResize && !hasFormat && !hasQuality && !hasGrayscale) {
+    if (!hasResize && !hasGrayscale) {
       throw new BadRequestException(
         'At least one valid transformation option must be provided.',
       );
