@@ -65,6 +65,24 @@ export class ImagesService {
       }
     }
 
+    // Crop
+    if (transformImageDto.crop) {
+      const metadata = await transformedImage.metadata();
+      const { width: imgWidth, height: imgHeight } = metadata;
+      const { width, height, left, top } = transformImageDto.crop;
+
+      if (left + width > imgWidth || top + height > imgHeight) {
+        throw new BadRequestException('Crop area is out of bounds');
+      }
+
+      transformedImage = transformedImage.extract({
+        left,
+        top,
+        width,
+        height,
+      });
+    }
+
     // Grayscale
     if (transformImageDto.grayscale) {
       transformedImage = transformedImage.grayscale();
