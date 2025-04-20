@@ -43,11 +43,11 @@ export class TransformedImagesService {
     }
 
     const stream = await this.awsS3Service.getFileStream(transformedImage.key);
+    const format =
+      transformedImage.transformation.format ??
+      transformedImage.originalImage.format;
 
-    res.setHeader(
-      'Content-Type',
-      'image/' + transformedImage.transformation.format,
-    );
+    res.setHeader('Content-Type', 'image/' + format);
 
     if (download) {
       res.setHeader(
