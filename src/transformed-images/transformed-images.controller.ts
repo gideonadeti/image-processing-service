@@ -2,9 +2,6 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   Controller,
   Get,
-  Post,
-  Body,
-  Patch,
   Param,
   Delete,
   UseGuards,
@@ -13,8 +10,6 @@ import {
 } from '@nestjs/common';
 
 import { TransformedImagesService } from './transformed-images.service';
-import { CreateTransformedImageDto } from './dto/create-transformed-image.dto';
-import { UpdateTransformedImageDto } from './dto/update-transformed-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { Response } from 'express';
@@ -27,11 +22,6 @@ export class TransformedImagesController {
   constructor(
     private readonly transformedImagesService: TransformedImagesService,
   ) {}
-
-  @Post()
-  create(@Body() createTransformedImageDto: CreateTransformedImageDto) {
-    return this.transformedImagesService.create(createTransformedImageDto);
-  }
 
   @Get()
   findAll() {
@@ -56,14 +46,6 @@ export class TransformedImagesController {
       res,
       download,
     );
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateTransformedImageDto: UpdateTransformedImageDto,
-  ) {
-    return this.transformedImagesService.update(+id, updateTransformedImageDto);
   }
 
   @Delete(':id')

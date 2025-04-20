@@ -6,7 +6,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   UseGuards,
@@ -18,7 +17,6 @@ import {
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
-import { UpdateImageDto } from './dto/update-image.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { FindAllProductsDto } from './dto/find-all-images.dto';
@@ -76,11 +74,6 @@ export class ImagesController {
     @Res() res: Response,
   ) {
     return this.imagesService.viewOrDownload(id, res, download);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateImageDto: UpdateImageDto) {
-    return this.imagesService.update(+id, updateImageDto);
   }
 
   @Delete(':id')
