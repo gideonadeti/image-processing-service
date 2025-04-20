@@ -44,23 +44,23 @@ export class ImagesService {
 
     // Resize
     if (transformImageDto.resize) {
-      const { width, height } = transformImageDto.resize;
+      const { width, height, fit } = transformImageDto.resize;
 
       if (width && height) {
         transformedImage = transformedImage.resize({
           width,
           height,
-          fit: transformImageDto.resize.fit || 'cover',
+          fit: fit || 'cover',
         });
       } else if (width) {
         transformedImage = transformedImage.resize({
           width,
-          fit: transformImageDto.resize.fit || 'cover',
+          fit: fit || 'cover',
         });
       } else if (height) {
         transformedImage = transformedImage.resize({
           height,
-          fit: transformImageDto.resize.fit || 'cover',
+          fit: fit || 'cover',
         });
       }
     }
