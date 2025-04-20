@@ -6,7 +6,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 
-import { UpdateImageDto } from './dto/update-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -322,10 +321,6 @@ export class ImagesService {
     }
 
     stream.pipe(res);
-  }
-
-  update(id: number, updateImageDto: UpdateImageDto) {
-    return `This action updates a #${id} image`;
   }
 
   async remove(id: string) {

@@ -1,6 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateTransformedImageDto } from './dto/create-transformed-image.dto';
-import { UpdateTransformedImageDto } from './dto/update-transformed-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Response } from 'express';
@@ -11,10 +9,6 @@ export class TransformedImagesService {
     private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
   ) {}
-
-  create(createTransformedImageDto: CreateTransformedImageDto) {
-    return 'This action adds a new transformedImage';
-  }
 
   findAll() {
     return `This action returns all transformedImages`;
@@ -64,10 +58,6 @@ export class TransformedImagesService {
     }
 
     stream.pipe(res);
-  }
-
-  update(id: number, updateTransformedImageDto: UpdateTransformedImageDto) {
-    return `This action updates a #${id} transformedImage`;
   }
 
   remove(id: number) {
