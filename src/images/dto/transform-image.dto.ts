@@ -111,4 +111,22 @@ export class TransformImageDto {
   @IsOptional()
   @IsBoolean()
   grayscale?: boolean;
+
+  /**
+   * Tint color to apply to the image.
+   * Accepts any valid color string supported by the 'color' package.
+   *
+   * Examples:
+   * - 'red'                      // Named color
+   * - '#ffcc00'                 // Hex
+   * - '#fc0'                    // Short hex
+   * - 'rgb(255, 204, 0)'        // RGB
+   * - 'rgba(255, 204, 0, 0.5)'  // RGBA
+   * - 'hsl(45, 100%, 50%)'      // HSL
+   * - 'hsla(45, 100%, 50%, 0.5)'// HSLA
+   *
+   * @example 'red'
+   */
+  @IsOptional()
+  tint?: string;
 }
