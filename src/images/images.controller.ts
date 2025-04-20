@@ -22,6 +22,7 @@ import { UserId } from 'src/user-id/user-id.decorator';
 import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
+import { Public } from 'src/public/public.decorator';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -68,13 +69,14 @@ export class ImagesController {
     return this.imagesService.findOne(id);
   }
 
+  @Public()
   @Get(':id/view')
   viewOrDownload(
     @Param('id') id: string,
-    @Res() res: Response,
     @Query() query: ViewOrDownloadImageDto,
+    @Res() res: Response,
   ) {
-    return this.imagesService.viewOrDownload(id, res, query);
+    return this.imagesService.viewOrDownload(id, query, res);
   }
 
   @Delete(':id')

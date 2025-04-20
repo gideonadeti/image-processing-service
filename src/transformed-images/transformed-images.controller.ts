@@ -11,9 +11,9 @@ import {
 
 import { TransformedImagesService } from './transformed-images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { UserId } from 'src/user-id/user-id.decorator';
 import { Response } from 'express';
 import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
+import { Public } from 'src/public/public.decorator';
 
 @ApiTags('TransformedImages')
 @ApiBearerAuth()
@@ -34,14 +34,14 @@ export class TransformedImagesController {
     return this.transformedImagesService.findOne(+id);
   }
 
+  @Public()
   @Get(':id/view')
   viewOrDownload(
-    @UserId() userId: string,
     @Param('id') id: string,
     @Query() query: ViewOrDownloadImageDto,
     @Res() res: Response,
   ) {
-    return this.transformedImagesService.viewOrDownload(userId, id, res, query);
+    return this.transformedImagesService.viewOrDownload(id, query, res);
   }
 
   @Delete(':id')
