@@ -13,6 +13,7 @@ import { TransformedImagesService } from './transformed-images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { Response } from 'express';
+import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 
 @ApiTags('TransformedImages')
 @ApiBearerAuth()
@@ -37,15 +38,10 @@ export class TransformedImagesController {
   viewOrDownload(
     @UserId() userId: string,
     @Param('id') id: string,
-    @Query('download') download: string,
+    @Query() query: ViewOrDownloadImageDto,
     @Res() res: Response,
   ) {
-    return this.transformedImagesService.viewOrDownload(
-      userId,
-      id,
-      res,
-      download,
-    );
+    return this.transformedImagesService.viewOrDownload(userId, id, res, query);
   }
 
   @Delete(':id')

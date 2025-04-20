@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Response } from 'express';
+import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 
 @Injectable()
 export class TransformedImagesService {
@@ -22,8 +23,9 @@ export class TransformedImagesService {
     userId: string,
     id: string,
     res: Response,
-    download?: string,
+    query: ViewOrDownloadImageDto,
   ) {
+    const { download } = query;
     const transformedImage =
       await this.prismaService.transformedImage.findUnique({
         where: {
@@ -48,7 +50,7 @@ export class TransformedImagesService {
       'image/' + transformedImage.transformation.format,
     );
 
-    if (download === 'true') {
+    if (download) {
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${transformedImage.originalImage.originalName}"`,
