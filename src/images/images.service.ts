@@ -93,6 +93,11 @@ export class ImagesService {
       transformedImage = transformedImage.grayscale();
     }
 
+    // Tint
+    if (transformImageDto.tint) {
+      transformedImage = transformedImage.tint(transformImageDto.tint);
+    }
+
     // 3. Final transformed image buffer
     return await transformedImage.toBuffer();
   };
