@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { FindAllProductsDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
+import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 
 @Injectable()
 export class ImagesService {
@@ -291,7 +292,12 @@ export class ImagesService {
     };
   }
 
-  async viewOrDownload(id: string, res: Response, download?: string) {
+  async viewOrDownload(
+    id: string,
+    res: Response,
+    query: ViewOrDownloadImageDto,
+  ) {
+    const { download } = query;
     const image = await this.prismaService.image.findUnique({
       where: {
         id,
@@ -311,7 +317,7 @@ export class ImagesService {
 
     res.setHeader('Content-Type', 'image/' + image.format);
 
-    if (download === 'true') {
+    if (download) {
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${image.originalName}"`,

@@ -21,6 +21,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { FindAllProductsDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
+import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -70,10 +71,10 @@ export class ImagesController {
   @Get(':id/view')
   viewOrDownload(
     @Param('id') id: string,
-    @Query('download') download: string,
     @Res() res: Response,
+    @Query() query: ViewOrDownloadImageDto,
   ) {
-    return this.imagesService.viewOrDownload(id, res, download);
+    return this.imagesService.viewOrDownload(id, res, query);
   }
 
   @Delete(':id')
