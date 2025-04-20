@@ -19,7 +19,7 @@ import {
 import { ImagesService } from './images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
-import { FindAllProductsDto } from './dto/find-all-images.dto';
+import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 
@@ -59,7 +59,7 @@ export class ImagesController {
   }
 
   @Get()
-  findAll(@UserId() userId: string, @Query() query: FindAllProductsDto) {
+  findAll(@UserId() userId: string, @Query() query: FindAllImagesDto) {
     return this.imagesService.findAll(userId, query);
   }
 

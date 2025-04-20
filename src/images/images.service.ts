@@ -10,7 +10,7 @@ import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { FindAllProductsDto } from './dto/find-all-images.dto';
+import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 
@@ -183,7 +183,7 @@ export class ImagesService {
     }
   }
 
-  async findAll(userId: string, query: FindAllProductsDto) {
+  async findAll(userId: string, query: FindAllImagesDto) {
     const { originalName, minSize, maxSize, sortBy, order, limit, page } =
       query;
 

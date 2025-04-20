@@ -8,7 +8,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class FindAllProductsDto {
+export class FindAllImagesDto {
   /**
    * Optional search term (partial match on image name)
    * @example cat
