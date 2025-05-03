@@ -32,7 +32,6 @@ export class TransformedImagesService {
         },
         include: {
           originalImage: true,
-          transformation: true,
         },
       });
 
