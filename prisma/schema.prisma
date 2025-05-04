@@ -48,32 +48,9 @@ model TransformedImage {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   originalImageId String   @db.ObjectId
   key             String
+  transformation  Json
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  originalImage  Image           @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
-  transformation Transformation?
-}
-
-model Transformation {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  transformedImageId String   @unique @db.ObjectId
-  resize             Json?
-  crop               Json?
-  rotate             Int?
-  grayscale          Boolean?
-  tint               String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  transformedImage TransformedImage   @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
-  fit              TransformationFit?
-}
-
-enum TransformationFit {
-  cover
-  contain
-  fill
-  inside
-  outside
+  originalImage Image @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
 }

@@ -177,37 +177,16 @@ export class ImagesService {
           data: {
             originalImageId: image.id,
             key,
-            transformation: {
-              create: {
-                resize: transformImageDto.resize as InputJsonObject,
-                crop: transformImageDto.crop as unknown as InputJsonObject,
-                rotate: transformImageDto.rotate,
-                grayscale: transformImageDto.grayscale,
-                tint: transformImageDto.tint,
-              },
-            },
-          },
-          select: {
-            id: true,
-            originalImageId: true,
-            key: false,
-            createdAt: true,
-            updatedAt: true,
-            transformation: {
-              select: {
-                resize: true,
-                crop: true,
-                rotate: true,
-                grayscale: true,
-                tint: true,
-              },
-            },
+            transformation: transformImageDto as InputJsonObject,
           },
         },
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key: _, ...rest } = transformedImage;
+
       return {
-        ...transformedImage,
+        ...rest,
         url:
           this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
       };
