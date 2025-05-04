@@ -225,21 +225,12 @@ export class ImagesService {
           where: {
             userId,
           },
-          select: {
-            id: true,
-            userId: true,
-            originalName: true,
-            size: true,
-            format: true,
-            key: false,
-            createdAt: true,
-            updatedAt: true,
-          },
         });
 
-        return images.map((image) => ({
-          ...image,
-          url: this.baseUrl + '/images/' + image.id + '/view',
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        return images.map(({ key, userId, ...rest }) => ({
+          ...rest,
+          url: this.baseUrl + '/images/' + rest.id + '/view',
         }));
       }
 
@@ -282,24 +273,17 @@ export class ImagesService {
       where: {
         id,
       },
-      select: {
-        id: true,
-        userId: true,
-        originalName: true,
-        size: true,
-        format: true,
-        key: false,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
 
     if (!image) {
       throw new BadRequestException(`Image with ID ${id} not found`);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { key, userId, ...rest } = image;
+
     return {
-      ...image,
+      ...rest,
       url: this.baseUrl + '/images/' + image.id + '/view',
     };
   }
@@ -356,7 +340,7 @@ export class ImagesService {
       await this.awsS3Service.deleteFile(image.key);
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, ...rest } = image;
+      const { key, userId, ...rest } = image;
 
       return {
         ...rest,
