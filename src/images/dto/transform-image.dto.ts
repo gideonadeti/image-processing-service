@@ -86,7 +86,6 @@ export class TransformImageDto {
 
   /**
    * Crop options for the image
-   * @example { "left": 100, "top": 50, "width": 300, "height": 200 }
    */
   @Type(() => CropOptions)
   @IsOptional()
