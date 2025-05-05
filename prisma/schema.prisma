@@ -49,8 +49,11 @@ model TransformedImage {
   originalImageId String   @db.ObjectId
   key             String
   transformation  Json
+  parentId        String?  @db.ObjectId
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  originalImage Image @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
+  originalImage                Image              @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
+  transformedTransformedImages TransformedImage[] @relation("TransformedImageTree")
+  parent                       TransformedImage?  @relation("TransformedImageTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
