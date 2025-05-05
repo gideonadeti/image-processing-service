@@ -24,6 +24,7 @@ import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 import { Public } from 'src/public/public.decorator';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -51,6 +52,7 @@ export class ImagesController {
     return this.imagesService.create(userId, file);
   }
 
+  @UseGuards(ThrottlerGuard)
   @Post(':id/transform')
   transform(
     @UserId() userId: string,

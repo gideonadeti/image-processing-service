@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { ImagesModule } from './images/images.module';
 import { AwsS3Service } from './aws-s3/aws-s3.service';
 import { TransformedImagesModule } from './transformed-images/transformed-images.module';
+import { minutes, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -16,6 +17,15 @@ import { TransformedImagesModule } from './transformed-images/transformed-images
       isGlobal: true,
     }),
     TransformedImagesModule,
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: minutes(1),
+          limit: 6,
+          getTracker: (req) => req.user?.id,
+        },
+      ],
+    }),
   ],
   controllers: [],
   providers: [PrismaService, AwsS3Service],
