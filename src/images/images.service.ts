@@ -116,20 +116,13 @@ export class ImagesService {
           format,
           key,
         },
-        select: {
-          id: true,
-          userId: true,
-          originalName: true,
-          size: true,
-          format: true,
-          key: false,
-          createdAt: true,
-          updatedAt: true,
-        },
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key: _a, userId: _b, ...rest } = image;
+
       return {
-        ...image,
+        ...rest,
         url: this.baseUrl + '/images/' + image.id + '/view',
       };
     } catch (error) {
@@ -335,11 +328,6 @@ export class ImagesService {
       const image = await this.prismaService.image.findUnique({
         where: {
           id,
-        },
-        select: {
-          key: true,
-          format: true,
-          originalName: true,
         },
       });
 
