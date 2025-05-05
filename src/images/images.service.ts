@@ -105,6 +105,7 @@ export class ImagesService {
 
   async create(userId: string, file: Express.Multer.File) {
     const format = file.mimetype.split('/')[1];
+
     try {
       const key = await this.awsS3Service.uploadFile(file, userId);
       const image = await this.prismaService.image.create({
@@ -269,23 +270,27 @@ export class ImagesService {
   }
 
   async findOne(id: string) {
-    const image = await this.prismaService.image.findUnique({
-      where: {
-        id,
-      },
-    });
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+        },
+      });
 
-    if (!image) {
-      throw new BadRequestException(`Image with ID ${id} not found`);
+      if (!image) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key, userId, ...rest } = image;
+
+      return {
+        ...rest,
+        url: this.baseUrl + '/images/' + image.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, `fetch image with ID ${id}`);
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { key, userId, ...rest } = image;
-
-    return {
-      ...rest,
-      url: this.baseUrl + '/images/' + image.id + '/view',
-    };
   }
 
   async findAllTransformed(id: string) {
@@ -325,35 +330,40 @@ export class ImagesService {
     res: Response,
   ) {
     const { download } = query;
-    const image = await this.prismaService.image.findUnique({
-      where: {
-        id,
-      },
-      select: {
-        key: true,
-        format: true,
-        originalName: true,
-      },
-    });
 
-    if (!image) {
-      throw new BadRequestException(`Image with ID ${id} not found`);
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+        },
+        select: {
+          key: true,
+          format: true,
+          originalName: true,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      const stream = await this.awsS3Service.getFileStream(image.key);
+
+      res.setHeader('Content-Type', 'image/' + image.format);
+
+      if (download) {
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${image.originalName}"`,
+        );
+      } else {
+        res.setHeader('Content-Disposition', 'inline');
+      }
+
+      stream.pipe(res);
+    } catch (error) {
+      this.handleError(error, `view or download image with ID ${id}`);
     }
-
-    const stream = await this.awsS3Service.getFileStream(image.key);
-
-    res.setHeader('Content-Type', 'image/' + image.format);
-
-    if (download) {
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${image.originalName}"`,
-      );
-    } else {
-      res.setHeader('Content-Disposition', 'inline');
-    }
-
-    stream.pipe(res);
   }
 
   async remove(id: string) {
