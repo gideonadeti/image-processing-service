@@ -32,7 +32,7 @@ export class TransformedImagesController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.transformedImagesService.findOne(+id);
+    return this.transformedImagesService.findOne(id);
   }
 
   @Public()

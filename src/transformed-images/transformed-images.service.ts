@@ -53,8 +53,30 @@ export class TransformedImagesService {
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} transformedImage`;
+  async findOne(id: string) {
+    try {
+      const transformedImage =
+        await this.prismaService.transformedImage.findUnique({
+          where: {
+            id,
+          },
+        });
+
+      if (!transformedImage) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key, ...rest } = transformedImage;
+
+      return {
+        ...rest,
+        url:
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, `fetch transformed image with ID ${id}`);
+    }
   }
 
   async viewOrDownload(
