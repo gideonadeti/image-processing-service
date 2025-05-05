@@ -118,7 +118,32 @@ export class TransformedImagesService {
     stream.pipe(res);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} transformedImage`;
+  async remove(id: string) {
+    try {
+      const transformedImage = await this.prismaService.transformedImage.delete(
+        {
+          where: {
+            id,
+          },
+        },
+      );
+
+      if (!transformedImage) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      await this.awsS3Service.deleteFile(transformedImage.key);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key, ...rest } = transformedImage;
+
+      return {
+        ...rest,
+        url:
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+      };
+    } catch (error) {
+      this.handleError(error, `delete transformed image with ID ${id}`);
+    }
   }
 }

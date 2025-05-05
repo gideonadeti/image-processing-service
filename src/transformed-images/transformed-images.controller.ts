@@ -47,6 +47,6 @@ export class TransformedImagesController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.transformedImagesService.remove(+id);
+    return this.transformedImagesService.remove(id);
   }
 }
