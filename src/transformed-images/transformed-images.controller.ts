@@ -14,6 +14,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Response } from 'express';
 import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 import { Public } from 'src/public/public.decorator';
+import { UserId } from 'src/user-id/user-id.decorator';
 
 @ApiTags('TransformedImages')
 @ApiBearerAuth()
@@ -25,8 +26,8 @@ export class TransformedImagesController {
   ) {}
 
   @Get()
-  findAll() {
-    return this.transformedImagesService.findAll();
+  findAll(@UserId() userId: string) {
+    return this.transformedImagesService.findAll(userId);
   }
 
   @Get(':id')
