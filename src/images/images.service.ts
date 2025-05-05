@@ -182,7 +182,12 @@ export class ImagesService {
       return {
         ...rest,
         url:
-          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+          this.baseUrl +
+          '/images/' +
+          image.id +
+          '/transformed/' +
+          transformedImage.id +
+          '/view',
       };
     } catch (error) {
       this.handleError(error, 'transform image');
