@@ -182,12 +182,7 @@ export class ImagesService {
       return {
         ...rest,
         url:
-          this.baseUrl +
-          '/images/' +
-          image.id +
-          '/transformed/' +
-          transformedImage.id +
-          '/view',
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
       };
     } catch (error) {
       this.handleError(error, 'transform image');
@@ -311,8 +306,7 @@ export class ImagesService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return transformedImages.map(({ key, originalImageId, ...rest }) => ({
         ...rest,
-        url:
-          this.baseUrl + '/images/' + id + '/transformed/' + rest.id + '/view',
+        url: this.baseUrl + '/transformed-images/' + rest.id + '/view',
       }));
     } catch (error) {
       this.handleError(
