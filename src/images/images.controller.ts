@@ -91,8 +91,8 @@ export class ImagesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.imagesService.findOne(id);
+  findOne(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.findOne(userId, id);
   }
 
   @Public()
@@ -106,12 +106,12 @@ export class ImagesController {
   }
 
   @Get(':id/transformed')
-  findAllTransformed(@Param('id') id: string) {
-    return this.imagesService.findAllTransformed(id);
+  findAllTransformed(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.findAllTransformed(userId, id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.imagesService.remove(id);
+  remove(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.remove(userId, id);
   }
 }

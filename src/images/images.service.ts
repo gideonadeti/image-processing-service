@@ -262,7 +262,7 @@ export class ImagesService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(userId: string, id: string) {
     try {
       const image = await this.prismaService.image.findUnique({
         where: {
@@ -274,8 +274,14 @@ export class ImagesService {
         throw new BadRequestException(`Image with ID ${id} not found`);
       }
 
+      if (image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to view this image',
+        );
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, userId, ...rest } = image;
+      const { key, userId: _, ...rest } = image;
 
       return {
         ...rest,
@@ -286,7 +292,7 @@ export class ImagesService {
     }
   }
 
-  async findAllTransformed(id: string) {
+  async findAllTransformed(userId: string, id: string) {
     try {
       const image = await this.prismaService.image.findUnique({
         where: {
@@ -299,6 +305,12 @@ export class ImagesService {
 
       if (!image) {
         throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      if (image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to view transformed images of this image',
+        );
       }
 
       const { transformedImages } = image;
@@ -353,7 +365,7 @@ export class ImagesService {
     }
   }
 
-  async remove(id: string) {
+  async remove(userId: string, id: string) {
     try {
       const image = await this.prismaService.image.delete({
         where: {
@@ -365,10 +377,16 @@ export class ImagesService {
         throw new BadRequestException(`Image with ID ${id} not found`);
       }
 
+      if (image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to delete this image',
+        );
+      }
+
       await this.awsS3Service.deleteFile(image.key);
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, userId, ...rest } = image;
+      const { key, userId: _, ...rest } = image;
 
       return {
         ...rest,

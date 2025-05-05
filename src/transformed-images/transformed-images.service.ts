@@ -53,12 +53,15 @@ export class TransformedImagesService {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(userId: string, id: string) {
     try {
       const transformedImage =
         await this.prismaService.transformedImage.findUnique({
           where: {
             id,
+          },
+          include: {
+            originalImage: true,
           },
         });
 
@@ -66,8 +69,14 @@ export class TransformedImagesService {
         throw new BadRequestException(`Image with ID ${id} not found`);
       }
 
+      if (transformedImage.originalImage.userId !== userId) {
+        throw new ForbiddenException(
+          `You do not have permission to access this transformed image`,
+        );
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, ...rest } = transformedImage;
+      const { key, originalImage, ...rest } = transformedImage;
 
       return {
         ...rest,
@@ -118,12 +127,15 @@ export class TransformedImagesService {
     stream.pipe(res);
   }
 
-  async remove(id: string) {
+  async remove(userId: string, id: string) {
     try {
       const transformedImage = await this.prismaService.transformedImage.delete(
         {
           where: {
             id,
+          },
+          include: {
+            originalImage: true,
           },
         },
       );
@@ -132,10 +144,16 @@ export class TransformedImagesService {
         throw new BadRequestException(`Image with ID ${id} not found`);
       }
 
+      if (transformedImage.originalImage.userId !== userId) {
+        throw new ForbiddenException(
+          `You do not have permission to delete this transformed image`,
+        );
+      }
+
       await this.awsS3Service.deleteFile(transformedImage.key);
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, ...rest } = transformedImage;
+      const { key, originalImage, ...rest } = transformedImage;
 
       return {
         ...rest,
