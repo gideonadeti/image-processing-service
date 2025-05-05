@@ -288,6 +288,37 @@ export class ImagesService {
     };
   }
 
+  async findAllTransformed(id: string) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+        },
+        include: {
+          transformedImages: true,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      const { transformedImages } = image;
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return transformedImages.map(({ key, originalImageId, ...rest }) => ({
+        ...rest,
+        url:
+          this.baseUrl + '/images/' + id + '/transformed/' + rest.id + '/view',
+      }));
+    } catch (error) {
+      this.handleError(
+        error,
+        `fetch transformed images of image with ID ${id}`,
+      );
+    }
+  }
+
   async viewOrDownload(
     id: string,
     query: ViewOrDownloadImageDto,

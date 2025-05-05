@@ -105,6 +105,11 @@ export class ImagesController {
     return this.imagesService.viewOrDownload(id, query, res);
   }
 
+  @Get(':id/transformed')
+  findAllTransformed(@Param('id') id: string) {
+    return this.imagesService.findAllTransformed(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.imagesService.remove(id);
