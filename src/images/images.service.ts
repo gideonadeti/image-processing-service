@@ -169,7 +169,7 @@ export class ImagesService {
           data: {
             originalImageId: image.id,
             key,
-            transformation: transformImageDto as InputJsonObject,
+            transformation: transformImageDto as unknown as InputJsonObject,
           },
         },
       );
