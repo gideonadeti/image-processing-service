@@ -19,6 +19,7 @@ import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dt
 import { Public } from 'src/public/public.decorator';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('TransformedImages')
 @ApiBearerAuth()
@@ -83,6 +84,7 @@ export class TransformedImagesController {
     }
   }
 
+  @UseGuards(ThrottlerGuard)
   @Post(':id/transform')
   transform(
     @UserId() userId: string,
