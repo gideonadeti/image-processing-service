@@ -39,6 +39,60 @@ export class ImagesController {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  private validateTransformations(dto: TransformImageDto) {
+    const hasResize =
+      dto.resize && (dto.resize.width != null || dto.resize.height != null);
+    const hasCrop = dto.crop != null;
+    const hasRotate = dto.rotate != null;
+    const hasGrayscale = dto.grayscale != null;
+    const hasTint = dto.tint != null;
+
+    if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
+      throw new BadRequestException(
+        'At least one valid transformation option must be provided.',
+      );
+    }
+
+    if (dto.resize?.fit != null && !dto.resize?.width && !dto.resize?.height) {
+      throw new BadRequestException(
+        "If 'fit' is provided, either 'width' or 'height' must also be provided.",
+      );
+    }
+  }
+
+  private validateOrderIntegrity(dto: TransformImageDto) {
+    const activeTransforms: Array<
+      'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'
+    > = [];
+
+    if (dto.resize && (dto.resize.width || dto.resize.height))
+      activeTransforms.push('resize');
+    if (dto.crop) activeTransforms.push('crop');
+    if (dto.rotate != null) activeTransforms.push('rotate');
+    if (dto.grayscale != null) activeTransforms.push('grayscale');
+    if (dto.tint != null) activeTransforms.push('tint');
+
+    const invalidSteps = dto.order.filter(
+      (step) => !activeTransforms.includes(step),
+    );
+
+    if (invalidSteps.length > 0) {
+      throw new BadRequestException(
+        `The following steps are in 'order' but not actually configured: ${invalidSteps.join(', ')}`,
+      );
+    }
+
+    const missingSteps = activeTransforms.filter(
+      (step) => !dto.order.includes(step),
+    );
+
+    if (missingSteps.length > 0) {
+      throw new BadRequestException(
+        `Missing transformation steps in 'order': ${missingSteps.join(', ')}`,
+      );
+    }
+  }
+
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   create(
@@ -65,63 +119,8 @@ export class ImagesController {
     @Param('id') id: string,
     @Body() transformImageDto: TransformImageDto,
   ) {
-    const hasResize =
-      transformImageDto.resize &&
-      (transformImageDto.resize.width != null ||
-        transformImageDto.resize.height != null);
-    const hasCrop = transformImageDto.crop != null;
-    const hasRotate = transformImageDto.rotate != null;
-    const hasGrayscale = transformImageDto.grayscale != null;
-    const hasTint = transformImageDto.tint != null;
-
-    if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
-      throw new BadRequestException(
-        'At least one valid transformation option must be provided.',
-      );
-    }
-
-    const fit = transformImageDto.resize?.fit;
-    const width = transformImageDto.resize?.width;
-    const height = transformImageDto.resize?.height;
-
-    if (fit != null && width == null && height == null) {
-      throw new BadRequestException(
-        "If 'fit' is provided, either 'width' or 'height' must also be provided.",
-      );
-    }
-
-    const activeTransforms: Array<
-      'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'
-    > = [];
-
-    if (hasResize) activeTransforms.push('resize');
-    if (hasCrop) activeTransforms.push('crop');
-    if (hasRotate) activeTransforms.push('rotate');
-    if (hasGrayscale) activeTransforms.push('grayscale');
-    if (hasTint) activeTransforms.push('tint');
-    if (transformImageDto.order) {
-      // Check for unknown steps
-      const invalidSteps = transformImageDto.order.filter(
-        (step) => !activeTransforms.includes(step),
-      );
-
-      if (invalidSteps.length > 0) {
-        throw new BadRequestException(
-          `The following steps are in 'order' but not actually configured: ${invalidSteps.join(', ')}`,
-        );
-      }
-
-      // Check for missing steps
-      const missingSteps = activeTransforms.filter(
-        (step) => !transformImageDto.order.includes(step),
-      );
-
-      if (missingSteps.length > 0) {
-        throw new BadRequestException(
-          `Missing transformation steps in 'order': ${missingSteps.join(', ')}`,
-        );
-      }
-    }
+    this.validateTransformations(transformImageDto);
+    this.validateOrderIntegrity(transformImageDto);
 
     return this.imagesService.transform(userId, id, transformImageDto);
   }
