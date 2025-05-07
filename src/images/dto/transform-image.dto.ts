@@ -128,4 +128,12 @@ export class TransformImageDto {
    */
   @IsOptional()
   tint?: string;
+
+  /**
+   * Order of transformations to apply.
+   * @example ['resize', 'crop', 'rotate']
+   */
+  @IsOptional()
+  @IsIn(['resize', 'crop', 'rotate', 'grayscale', 'tint'], { each: true })
+  order?: Array<'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'>;
 }

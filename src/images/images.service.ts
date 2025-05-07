@@ -42,64 +42,62 @@ export class ImagesService {
     transformImageDto: TransformImageDto,
   ) => {
     let transformedImage = sharp(imageBuffer);
+    const { order, resize, crop, rotate, tint } = transformImageDto;
 
-    // Resize
-    if (transformImageDto.resize) {
-      const { width, height, fit } = transformImageDto.resize;
+    for (const step of order) {
+      switch (step) {
+        case 'resize': {
+          transformedImage = transformedImage.resize({
+            width: resize.width,
+            height: resize.height,
+            fit: resize.fit || 'cover',
+          });
 
-      if (width && height) {
-        transformedImage = transformedImage.resize({
-          width,
-          height,
-          fit: fit || 'cover',
-        });
-      } else if (width) {
-        transformedImage = transformedImage.resize({
-          width,
-          fit: fit || 'cover',
-        });
-      } else if (height) {
-        transformedImage = transformedImage.resize({
-          height,
-          fit: fit || 'cover',
-        });
+          break;
+        }
+
+        case 'crop': {
+          const metadata = await transformedImage.metadata();
+          const { width: imgWidth, height: imgHeight } = metadata;
+          const { width, height, left, top } = crop;
+
+          if (left + width > imgWidth || top + height > imgHeight) {
+            throw new BadRequestException('Crop area is out of bounds');
+          }
+
+          transformedImage = transformedImage.extract({
+            left,
+            top,
+            width,
+            height,
+          });
+
+          break;
+        }
+
+        case 'rotate': {
+          transformedImage = transformedImage.rotate(rotate);
+
+          break;
+        }
+
+        case 'grayscale': {
+          transformedImage = transformedImage.grayscale();
+
+          break;
+        }
+
+        case 'tint': {
+          transformedImage = transformedImage.tint(tint);
+
+          break;
+        }
+
+        default:
+          throw new BadRequestException(`Unsupported transformation: ${step}`);
       }
     }
 
-    // Crop
-    if (transformImageDto.crop) {
-      const metadata = await transformedImage.metadata();
-      const { width: imgWidth, height: imgHeight } = metadata;
-      const { width, height, left, top } = transformImageDto.crop;
-
-      if (left + width > imgWidth || top + height > imgHeight) {
-        throw new BadRequestException('Crop area is out of bounds');
-      }
-
-      transformedImage = transformedImage.extract({
-        left,
-        top,
-        width,
-        height,
-      });
-    }
-
-    // Rotate
-    if (transformImageDto.rotate) {
-      transformedImage = transformedImage.rotate(transformImageDto.rotate);
-    }
-
-    // Grayscale
-    if (transformImageDto.grayscale) {
-      transformedImage = transformedImage.grayscale();
-    }
-
-    // Tint
-    if (transformImageDto.tint) {
-      transformedImage = transformedImage.tint(transformImageDto.tint);
-    }
-
-    // 3. Final transformed image buffer
     return await transformedImage.toBuffer();
   };
 

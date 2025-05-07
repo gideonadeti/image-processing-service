@@ -90,6 +90,39 @@ export class ImagesController {
       );
     }
 
+    const activeTransforms: Array<
+      'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'
+    > = [];
+
+    if (hasResize) activeTransforms.push('resize');
+    if (hasCrop) activeTransforms.push('crop');
+    if (hasRotate) activeTransforms.push('rotate');
+    if (hasGrayscale) activeTransforms.push('grayscale');
+    if (hasTint) activeTransforms.push('tint');
+    if (transformImageDto.order) {
+      // Check for unknown steps
+      const invalidSteps = transformImageDto.order.filter(
+        (step) => !activeTransforms.includes(step),
+      );
+
+      if (invalidSteps.length > 0) {
+        throw new BadRequestException(
+          `The following steps are in 'order' but not actually configured: ${invalidSteps.join(', ')}`,
+        );
+      }
+
+      // Check for missing steps
+      const missingSteps = activeTransforms.filter(
+        (step) => !transformImageDto.order.includes(step),
+      );
+
+      if (missingSteps.length > 0) {
+        throw new BadRequestException(
+          `Missing transformation steps in 'order': ${missingSteps.join(', ')}`,
+        );
+      }
+    }
+
     return this.imagesService.transform(userId, id, transformImageDto);
   }
 
