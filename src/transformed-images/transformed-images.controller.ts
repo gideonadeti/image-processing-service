@@ -29,20 +29,13 @@ export class TransformedImagesController {
     private readonly transformedImagesService: TransformedImagesService,
   ) {}
 
-  @Post(':id/transform')
-  transform(
-    @UserId() userId: string,
-    @Param('id') id: string,
-    @Body() transformImageDto: TransformImageDto,
-  ) {
+  private validateTransformations(dto: TransformImageDto) {
     const hasResize =
-      transformImageDto.resize &&
-      (transformImageDto.resize.width != null ||
-        transformImageDto.resize.height != null);
-    const hasCrop = transformImageDto.crop != null;
-    const hasRotate = transformImageDto.rotate != null;
-    const hasGrayscale = transformImageDto.grayscale != null;
-    const hasTint = transformImageDto.tint != null;
+      dto.resize && (dto.resize.width != null || dto.resize.height != null);
+    const hasCrop = dto.crop != null;
+    const hasRotate = dto.rotate != null;
+    const hasGrayscale = dto.grayscale != null;
+    const hasTint = dto.tint != null;
 
     if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
       throw new BadRequestException(
@@ -50,15 +43,54 @@ export class TransformedImagesController {
       );
     }
 
-    const fit = transformImageDto.resize?.fit;
-    const width = transformImageDto.resize?.width;
-    const height = transformImageDto.resize?.height;
-
-    if (fit != null && width == null && height == null) {
+    if (dto.resize?.fit != null && !dto.resize?.width && !dto.resize?.height) {
       throw new BadRequestException(
         "If 'fit' is provided, either 'width' or 'height' must also be provided.",
       );
     }
+  }
+
+  private validateOrderIntegrity(dto: TransformImageDto) {
+    const activeTransforms: Array<
+      'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'
+    > = [];
+
+    if (dto.resize && (dto.resize.width || dto.resize.height))
+      activeTransforms.push('resize');
+    if (dto.crop) activeTransforms.push('crop');
+    if (dto.rotate != null) activeTransforms.push('rotate');
+    if (dto.grayscale != null) activeTransforms.push('grayscale');
+    if (dto.tint != null) activeTransforms.push('tint');
+
+    const invalidSteps = dto.order.filter(
+      (step) => !activeTransforms.includes(step),
+    );
+
+    if (invalidSteps.length > 0) {
+      throw new BadRequestException(
+        `The following steps are in 'order' but not actually configured: ${invalidSteps.join(', ')}`,
+      );
+    }
+
+    const missingSteps = activeTransforms.filter(
+      (step) => !dto.order.includes(step),
+    );
+
+    if (missingSteps.length > 0) {
+      throw new BadRequestException(
+        `Missing transformation steps in 'order': ${missingSteps.join(', ')}`,
+      );
+    }
+  }
+
+  @Post(':id/transform')
+  transform(
+    @UserId() userId: string,
+    @Param('id') id: string,
+    @Body() transformImageDto: TransformImageDto,
+  ) {
+    this.validateTransformations(transformImageDto);
+    this.validateOrderIntegrity(transformImageDto);
 
     return this.transformedImagesService.transform(
       userId,
