@@ -1,17 +1,23 @@
 import * as sharp from 'sharp';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Response } from 'express';
 import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
-import { ConfigService } from '@nestjs/config';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
 import { InputJsonObject } from 'generated/prisma/runtime/library';
+import { TransformedImage } from 'generated/prisma';
 
 @Injectable()
 export class TransformedImagesService {
@@ -19,6 +25,7 @@ export class TransformedImagesService {
     private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
@@ -101,6 +108,27 @@ export class TransformedImagesService {
     return await transformedImage.toBuffer();
   };
 
+  private generateTransformedTransformedImageCacheKey(
+    userId: string,
+    transformedImageId: string,
+    transformImageDto: TransformImageDto,
+  ): string {
+    const filteredOptions = Object.fromEntries(
+      Object.entries(transformImageDto).filter(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ([_, value]) => value !== undefined && value !== null,
+      ),
+    );
+    const sortedOptions = Object.fromEntries(
+      Object.entries(filteredOptions).sort(([a], [b]) => a.localeCompare(b)),
+    );
+    const hash = createHash('sha256')
+      .update(JSON.stringify(sortedOptions))
+      .digest('hex');
+
+    return `${userId}:transformations:${transformedImageId}-${hash}`;
+  }
+
   async transform(
     userId: string,
     id: string,
@@ -127,6 +155,29 @@ export class TransformedImagesService {
         );
       }
 
+      const transformedTransformedImageCacheKey =
+        this.generateTransformedTransformedImageCacheKey(
+          userId,
+          id,
+          transformImageDto,
+        );
+      let transformedTransformedImage: TransformedImage =
+        await this.cacheManager.get(transformedTransformedImageCacheKey);
+
+      if (transformedTransformedImage) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { key: _, ...rest } = transformedTransformedImage;
+
+        return {
+          ...rest,
+          url:
+            this.baseUrl +
+            '/transformed-images/' +
+            transformedTransformedImage.id +
+            '/view',
+        };
+      }
+
       const transformedImageBuffer = await this.awsS3Service.getFileBuffer(
         transformedImage.key,
       );
@@ -143,7 +194,7 @@ export class TransformedImagesService {
         expressMulterFile,
         `${userId}/transformations`,
       );
-      const transformedTransformedImage =
+      transformedTransformedImage =
         await this.prismaService.transformedImage.create({
           data: {
             originalImageId: transformedImage.originalImage.id,
@@ -155,8 +206,7 @@ export class TransformedImagesService {
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { key: _, ...rest } = transformedTransformedImage;
-
-      return {
+      const response = {
         ...rest,
         url:
           this.baseUrl +
@@ -164,6 +214,13 @@ export class TransformedImagesService {
           transformedTransformedImage.id +
           '/view',
       };
+
+      await this.cacheManager.set(
+        transformedTransformedImageCacheKey,
+        response,
+      );
+
+      return response;
     } catch (error) {
       this.handleError(error, 'transform transformed image');
     }
