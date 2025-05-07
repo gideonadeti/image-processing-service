@@ -1,6 +1,9 @@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import {
   Controller,
   Get,
@@ -15,6 +18,7 @@ import {
   Res,
   Query,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
@@ -24,14 +28,16 @@ import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 import { Public } from 'src/public/public.decorator';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('Images')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('images')
 export class ImagesController {
-  constructor(private readonly imagesService: ImagesService) {}
+  constructor(
+    private readonly imagesService: ImagesService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))

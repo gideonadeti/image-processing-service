@@ -8,6 +8,7 @@ import { ImagesModule } from './images/images.module';
 import { AwsS3Service } from './aws-s3/aws-s3.service';
 import { TransformedImagesModule } from './transformed-images/transformed-images.module';
 import { minutes, ThrottlerModule } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { minutes, ThrottlerModule } from '@nestjs/throttler';
         },
       ],
     }),
+    CacheModule.register({ isGlobal: true }),
   ],
   controllers: [],
   providers: [PrismaService, AwsS3Service],
