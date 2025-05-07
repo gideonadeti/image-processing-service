@@ -2,8 +2,6 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import {
   Controller,
   Get,
@@ -18,7 +16,6 @@ import {
   Res,
   Query,
   BadRequestException,
-  Inject,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
@@ -34,10 +31,7 @@ import { Public } from 'src/public/public.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('images')
 export class ImagesController {
-  constructor(
-    private readonly imagesService: ImagesService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  constructor(private readonly imagesService: ImagesService) {}
 
   private validateTransformations(dto: TransformImageDto) {
     const hasResize =
