@@ -10,6 +10,9 @@ import {
   IsNumber,
   Min,
   Max,
+  IsArray,
+  ArrayNotEmpty,
+  ArrayUnique,
 } from 'class-validator';
 
 export class ResizeOptions {
@@ -128,4 +131,15 @@ export class TransformImageDto {
    */
   @IsOptional()
   tint?: string;
+
+  /**
+   * Order of transformations to apply.
+   * @example ['resize', 'crop', 'rotate']
+   */
+  @IsDefined()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsIn(['resize', 'crop', 'rotate', 'grayscale', 'tint'], { each: true })
+  order: Array<'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'>;
 }

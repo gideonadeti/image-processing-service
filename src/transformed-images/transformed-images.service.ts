@@ -148,7 +148,7 @@ export class TransformedImagesService {
           data: {
             originalImageId: transformedImage.originalImage.id,
             key,
-            transformation: transformImageDto as InputJsonObject,
+            transformation: transformImageDto as unknown as InputJsonObject,
             parentId: transformedImage.id,
           },
         });
