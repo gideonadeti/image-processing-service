@@ -1,7 +1,11 @@
 import * as sharp from 'sharp';
+import { createHash } from 'crypto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -14,6 +18,7 @@ import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 import { InputJsonObject } from 'generated/prisma/runtime/library';
+import { TransformedImage } from 'generated/prisma';
 
 @Injectable()
 export class ImagesService {
@@ -21,6 +26,7 @@ export class ImagesService {
     private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
@@ -101,6 +107,27 @@ export class ImagesService {
     return await transformedImage.toBuffer();
   };
 
+  private generateTransformedImageCacheKey(
+    userId: string,
+    imageId: string,
+    transformImageDto: TransformImageDto,
+  ): string {
+    const filteredOptions = Object.fromEntries(
+      Object.entries(transformImageDto).filter(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ([_, value]) => value !== undefined && value !== null,
+      ),
+    );
+    const sortedOptions = Object.fromEntries(
+      Object.entries(filteredOptions).sort(([a], [b]) => a.localeCompare(b)),
+    );
+    const hash = createHash('sha256')
+      .update(JSON.stringify(sortedOptions))
+      .digest('hex');
+
+    return `${userId}:transformations:${imageId}-${hash}`;
+  }
+
   async create(userId: string, file: Express.Multer.File) {
     const format = file.mimetype.split('/')[1];
 
@@ -150,6 +177,29 @@ export class ImagesService {
         );
       }
 
+      const transformedImageCacheKey = this.generateTransformedImageCacheKey(
+        userId,
+        id,
+        transformImageDto,
+      );
+      let transformedImage: TransformedImage = await this.cacheManager.get(
+        transformedImageCacheKey,
+      );
+
+      if (transformedImage) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { key: _, ...rest } = transformedImage;
+
+        return {
+          ...rest,
+          url:
+            this.baseUrl +
+            '/transformed-images/' +
+            transformedImage.id +
+            '/view',
+        };
+      }
+
       const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
       const transformedImageBuffer = await this.transformImage(
         imageBuffer,
@@ -164,24 +214,25 @@ export class ImagesService {
         expressMulterFile,
         `${userId}/transformations`,
       );
-      const transformedImage = await this.prismaService.transformedImage.create(
-        {
-          data: {
-            originalImageId: image.id,
-            key,
-            transformation: transformImageDto as unknown as InputJsonObject,
-          },
+      transformedImage = await this.prismaService.transformedImage.create({
+        data: {
+          originalImageId: image.id,
+          key,
+          transformation: transformImageDto as unknown as InputJsonObject,
         },
-      );
+      });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { key: _, ...rest } = transformedImage;
-
-      return {
+      const response = {
         ...rest,
         url:
           this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
       };
+
+      await this.cacheManager.set(transformedImageCacheKey, response);
+
+      return response;
     } catch (error) {
       this.handleError(error, 'transform image');
     }
