@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -26,6 +28,7 @@ export class TransformedImagesService {
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('transformed-images') private transformedImagesQueue: Queue,
   ) {}
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
@@ -177,6 +180,18 @@ export class TransformedImagesService {
             '/view',
         };
       }
+
+      const job = await this.transformedImagesQueue.add('transform', {
+        userId,
+        transformedImage,
+        transformImageDto,
+        transformedTransformedImageCacheKey,
+      });
+
+      return {
+        jobId: job.id,
+        status: 'queued',
+      };
 
       const transformedImageBuffer = await this.awsS3Service.getFileBuffer(
         transformedImage.key,
