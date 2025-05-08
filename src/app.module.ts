@@ -39,6 +39,11 @@ import { TransformedImagesModule } from './transformed-images/transformed-images
           username: config.get<string>('REDIS_USERNAME'),
           password: config.get<string>('REDIS_PASSWORD'),
         },
+        defaultJobOptions: {
+          attempts: 2,
+          removeOnComplete: 10,
+          removeOnFail: 10,
+        },
       }),
     }),
   ],
