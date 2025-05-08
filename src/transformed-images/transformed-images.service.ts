@@ -1,9 +1,10 @@
-import * as sharp from 'sharp';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,7 +17,6 @@ import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
-import { InputJsonObject } from 'generated/prisma/runtime/library';
 import { TransformedImage } from 'generated/prisma';
 
 @Injectable()
@@ -26,6 +26,7 @@ export class TransformedImagesService {
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('transformed-images') private transformedImagesQueue: Queue,
   ) {}
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
@@ -41,72 +42,6 @@ export class TransformedImagesService {
 
     throw new InternalServerErrorException(`Failed to ${action}`);
   }
-
-  private transformImage = async (
-    imageBuffer: Buffer,
-    transformImageDto: TransformImageDto,
-  ) => {
-    let transformedImage = sharp(imageBuffer);
-
-    // Resize
-    if (transformImageDto.resize) {
-      const { width, height, fit } = transformImageDto.resize;
-
-      if (width && height) {
-        transformedImage = transformedImage.resize({
-          width,
-          height,
-          fit: fit || 'cover',
-        });
-      } else if (width) {
-        transformedImage = transformedImage.resize({
-          width,
-          fit: fit || 'cover',
-        });
-      } else if (height) {
-        transformedImage = transformedImage.resize({
-          height,
-          fit: fit || 'cover',
-        });
-      }
-    }
-
-    // Crop
-    if (transformImageDto.crop) {
-      const metadata = await transformedImage.metadata();
-      const { width: imgWidth, height: imgHeight } = metadata;
-      const { width, height, left, top } = transformImageDto.crop;
-
-      if (left + width > imgWidth || top + height > imgHeight) {
-        throw new BadRequestException('Crop area is out of bounds');
-      }
-
-      transformedImage = transformedImage.extract({
-        left,
-        top,
-        width,
-        height,
-      });
-    }
-
-    // Rotate
-    if (transformImageDto.rotate) {
-      transformedImage = transformedImage.rotate(transformImageDto.rotate);
-    }
-
-    // Grayscale
-    if (transformImageDto.grayscale) {
-      transformedImage = transformedImage.grayscale();
-    }
-
-    // Tint
-    if (transformImageDto.tint) {
-      transformedImage = transformedImage.tint(transformImageDto.tint);
-    }
-
-    // 3. Final transformed image buffer
-    return await transformedImage.toBuffer();
-  };
 
   private generateTransformedTransformedImageCacheKey(
     userId: string,
@@ -161,7 +96,7 @@ export class TransformedImagesService {
           id,
           transformImageDto,
         );
-      let transformedTransformedImage: TransformedImage =
+      const transformedTransformedImage: TransformedImage =
         await this.cacheManager.get(transformedTransformedImageCacheKey);
 
       if (transformedTransformedImage) {
@@ -178,49 +113,17 @@ export class TransformedImagesService {
         };
       }
 
-      const transformedImageBuffer = await this.awsS3Service.getFileBuffer(
-        transformedImage.key,
-      );
-      const transformedTransformedImageBuffer = await this.transformImage(
-        transformedImageBuffer,
+      const job = await this.transformedImagesQueue.add('transform', {
+        userId,
+        transformedImage,
         transformImageDto,
-      );
-      const expressMulterFile = {
-        buffer: transformedTransformedImageBuffer,
-        originalname: transformedImage.originalImage.originalName,
-        mimetype: `image/${transformedImage.originalImage.format}`,
-      } as Express.Multer.File;
-      const key = await this.awsS3Service.uploadFile(
-        expressMulterFile,
-        `${userId}/transformations`,
-      );
-      transformedTransformedImage =
-        await this.prismaService.transformedImage.create({
-          data: {
-            originalImageId: transformedImage.originalImage.id,
-            key,
-            transformation: transformImageDto as unknown as InputJsonObject,
-            parentId: transformedImage.id,
-          },
-        });
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: _, ...rest } = transformedTransformedImage;
-      const response = {
-        ...rest,
-        url:
-          this.baseUrl +
-          '/transformed-images/' +
-          transformedTransformedImage.id +
-          '/view',
-      };
-
-      await this.cacheManager.set(
         transformedTransformedImageCacheKey,
-        response,
-      );
+      });
 
-      return response;
+      return {
+        jobId: job.id,
+        status: 'queued',
+      };
     } catch (error) {
       this.handleError(error, 'transform transformed image');
     }
