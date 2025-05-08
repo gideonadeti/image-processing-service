@@ -2,6 +2,7 @@ import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { Socket } from 'socket.io';
 import {
   ConflictException,
   Injectable,
@@ -207,5 +208,20 @@ export class AuthService {
     } catch (error) {
       throw error;
     }
+  }
+
+  async validateClient(client: Socket & { user: any }) {
+    const authHeader = client.handshake.headers['authorization'];
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
+    }
+
+    const payload = this.jwtService.verify<AuthPayload>(token, {
+      secret: jwtConstants.accessSecret,
+    });
+
+    client.user = payload;
   }
 }
