@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { LoggingMiddleware } from './logging/logging.middleware';
 import { PrismaService } from './prisma/prisma.service';
@@ -9,6 +9,7 @@ import { AwsS3Service } from './aws-s3/aws-s3.service';
 import { TransformedImagesModule } from './transformed-images/transformed-images.module';
 import { minutes, ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -28,6 +29,18 @@ import { CacheModule } from '@nestjs/cache-manager';
       ],
     }),
     CacheModule.register({ isGlobal: true }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST'),
+          port: config.get<number>('REDIS_PORT'),
+          username: config.get<string>('REDIS_USERNAME'),
+          password: config.get<string>('REDIS_PASSWORD'),
+        },
+      }),
+    }),
   ],
   controllers: [],
   providers: [PrismaService, AwsS3Service],
