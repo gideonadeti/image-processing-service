@@ -1,4 +1,3 @@
-import * as sharp from 'sharp';
 import { createHash } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -19,7 +18,6 @@ import { Response } from 'express';
 import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
-import { InputJsonObject } from 'generated/prisma/runtime/library';
 import { TransformedImage } from 'generated/prisma';
 
 @Injectable()
@@ -45,70 +43,6 @@ export class ImagesService {
 
     throw new InternalServerErrorException(`Failed to ${action}`);
   }
-
-  private transformImage = async (
-    imageBuffer: Buffer,
-    transformImageDto: TransformImageDto,
-  ) => {
-    let transformedImage = sharp(imageBuffer);
-    const { order, resize, crop, rotate, tint } = transformImageDto;
-
-    for (const step of order) {
-      switch (step) {
-        case 'resize': {
-          transformedImage = transformedImage.resize({
-            width: resize.width,
-            height: resize.height,
-            fit: resize.fit || 'cover',
-          });
-
-          break;
-        }
-
-        case 'crop': {
-          const metadata = await transformedImage.metadata();
-          const { width: imgWidth, height: imgHeight } = metadata;
-          const { width, height, left, top } = crop;
-
-          if (left + width > imgWidth || top + height > imgHeight) {
-            throw new BadRequestException('Crop area is out of bounds');
-          }
-
-          transformedImage = transformedImage.extract({
-            left,
-            top,
-            width,
-            height,
-          });
-
-          break;
-        }
-
-        case 'rotate': {
-          transformedImage = transformedImage.rotate(rotate);
-
-          break;
-        }
-
-        case 'grayscale': {
-          transformedImage = transformedImage.grayscale();
-
-          break;
-        }
-
-        case 'tint': {
-          transformedImage = transformedImage.tint(tint);
-
-          break;
-        }
-
-        default:
-          throw new BadRequestException(`Unsupported transformation: ${step}`);
-      }
-    }
-
-    return await transformedImage.toBuffer();
-  };
 
   private generateTransformedImageCacheKey(
     userId: string,
@@ -185,7 +119,7 @@ export class ImagesService {
         id,
         transformImageDto,
       );
-      let transformedImage: TransformedImage = await this.cacheManager.get(
+      const transformedImage: TransformedImage = await this.cacheManager.get(
         transformedImageCacheKey,
       );
 
@@ -207,46 +141,13 @@ export class ImagesService {
         userId,
         image,
         transformImageDto,
+        transformedImageCacheKey,
       });
 
       return {
         jobId: job.id,
         status: 'queued',
       };
-
-      const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
-      const transformedImageBuffer = await this.transformImage(
-        imageBuffer,
-        transformImageDto,
-      );
-      const expressMulterFile = {
-        buffer: transformedImageBuffer,
-        originalname: image.originalName,
-        mimetype: `image/${image.format}`,
-      } as Express.Multer.File;
-      const key = await this.awsS3Service.uploadFile(
-        expressMulterFile,
-        `${userId}/transformations`,
-      );
-      transformedImage = await this.prismaService.transformedImage.create({
-        data: {
-          originalImageId: image.id,
-          key,
-          transformation: transformImageDto as unknown as InputJsonObject,
-        },
-      });
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: _, ...rest } = transformedImage;
-      const response = {
-        ...rest,
-        url:
-          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
-      };
-
-      await this.cacheManager.set(transformedImageCacheKey, response);
-
-      return response;
     } catch (error) {
       this.handleError(error, 'transform image');
     }
