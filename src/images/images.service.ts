@@ -2,6 +2,8 @@ import * as sharp from 'sharp';
 import { createHash } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -27,6 +29,7 @@ export class ImagesService {
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('images') private imagesQueue: Queue,
   ) {}
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
@@ -199,6 +202,17 @@ export class ImagesService {
             '/view',
         };
       }
+
+      const job = await this.imagesQueue.add('transform', {
+        userId,
+        image,
+        transformImageDto,
+      });
+
+      return {
+        jobId: job.id,
+        status: 'queued',
+      };
 
       const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
       const transformedImageBuffer = await this.transformImage(
