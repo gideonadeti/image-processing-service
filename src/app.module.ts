@@ -42,8 +42,8 @@ import { JobsModule } from './jobs/jobs.module';
         },
         defaultJobOptions: {
           attempts: 2,
-          removeOnComplete: 10,
-          removeOnFail: 10,
+          removeOnComplete: 100,
+          removeOnFail: 100,
         },
       }),
     }),
