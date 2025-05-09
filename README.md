@@ -76,7 +76,7 @@ Swagger docs available at: `http://localhost:3000/api/documentation`
 
 ## Live Deployment
 
-Check out the live API on [Render](#)
+Check out the live API on [Render](https://image-processing-service-nb06.onrender.com/api/documentation)
 
 ## Background
 
