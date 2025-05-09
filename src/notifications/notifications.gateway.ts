@@ -24,7 +24,7 @@ export class NotificationsGateway
   afterInit(server: Server) {
     server.use(wsJwtAuthMiddleware(this.authService));
 
-    Logger.log('WebSocket server initialized');
+    Logger.log('WebSocket server initialized', NotificationsGateway.name);
   }
   handleConnection(client: Socket & { user: any }) {
     const userId = client.user.sub;
