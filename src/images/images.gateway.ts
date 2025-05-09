@@ -5,6 +5,7 @@ import {
   OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from 'src/auth/auth.service';
@@ -20,13 +21,16 @@ export class ImagesGateway
 
   private userSocketMap = new Map<string, string>();
 
+  @WebSocketServer()
+  server: Server;
+
   afterInit(server: Server) {
     server.use(wsJwtAuthMiddleware(this.authService));
 
     Logger.log('WebSocket server initialized');
   }
   handleConnection(client: Socket & { user: any }) {
-    const userId = client.user.id;
+    const userId = client.user.sub;
 
     this.userSocketMap.set(userId, client.id);
 
@@ -34,11 +38,19 @@ export class ImagesGateway
   }
 
   handleDisconnect(client: Socket & { user: any }) {
-    const userId = client.user.id;
+    const userId = client.user.sub;
 
     this.userSocketMap.delete(userId);
 
     Logger.log(`Client with id ${client.id} disconnected`, ImagesGateway.name);
+  }
+
+  emitToUser(userId: string, event: string, payload: any) {
+    const socketId = this.userSocketMap.get(userId);
+
+    if (socketId) {
+      this.server.to(socketId).emit(event, payload);
+    }
   }
 
   @SubscribeMessage('message')

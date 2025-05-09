@@ -15,6 +15,7 @@ import { TransformImageDto } from './dto/transform-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InputJsonObject } from 'generated/prisma/runtime/library';
+import { ImagesGateway } from './images.gateway';
 
 @Processor('images', { concurrency: 2 })
 export class ImagesProcessor extends WorkerHost {
@@ -23,6 +24,7 @@ export class ImagesProcessor extends WorkerHost {
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly imagesGateway: ImagesGateway,
   ) {
     super();
   }
@@ -154,11 +156,23 @@ export class ImagesProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job, result: any) {
-    console.log(`Job ${job.id} completed with result:`, result);
+    console.log(`Job with ID ${job.id} completed`);
+
+    this.imagesGateway.emitToUser(
+      job.data.userId,
+      'image-transformation-completed',
+      result,
+    );
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
-    console.error(`Job ${job.id} failed with error:`, error);
+    console.error(`Job with ID ${job.id} failed`);
+
+    this.imagesGateway.emitToUser(
+      job.data.userId,
+      'image-transformation-failed',
+      error.message,
+    );
   }
 }
