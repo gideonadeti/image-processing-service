@@ -1,0 +1,183 @@
+import * as sharp from 'sharp';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+
+import { TransformImageDto } from './dto/transform-image.dto';
+import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { InputJsonObject } from 'generated/prisma/runtime/library';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+
+@Processor('images', { concurrency: 2 })
+export class ImagesProcessor extends WorkerHost {
+  constructor(
+    private readonly awsS3Service: AwsS3Service,
+    private readonly prismaService: PrismaService,
+    private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {
+    super();
+  }
+
+  private readonly baseUrl = this.configService.get<string>('BASE_URL');
+
+  private handleError(error: any, action: string) {
+    console.error(`Failed to ${action}:`, error);
+
+    if (
+      error instanceof BadRequestException ||
+      error instanceof ForbiddenException
+    ) {
+      throw error;
+    }
+
+    throw new InternalServerErrorException(`Failed to ${action}`);
+  }
+
+  private transformImage = async (
+    imageBuffer: Buffer,
+    transformImageDto: TransformImageDto,
+  ) => {
+    let transformedImage = sharp(imageBuffer);
+    const { order, resize, crop, rotate, tint } = transformImageDto;
+
+    for (const step of order) {
+      switch (step) {
+        case 'resize': {
+          transformedImage = transformedImage.resize({
+            width: resize.width,
+            height: resize.height,
+            fit: resize.fit || 'cover',
+          });
+
+          break;
+        }
+
+        case 'crop': {
+          const metadata = await transformedImage.metadata();
+          const { width: imgWidth, height: imgHeight } = metadata;
+          const { width, height, left, top } = crop;
+
+          if (left + width > imgWidth || top + height > imgHeight) {
+            throw new BadRequestException('Crop area is out of bounds');
+          }
+
+          transformedImage = transformedImage.extract({
+            left,
+            top,
+            width,
+            height,
+          });
+
+          break;
+        }
+
+        case 'rotate': {
+          transformedImage = transformedImage.rotate(rotate);
+
+          break;
+        }
+
+        case 'grayscale': {
+          transformedImage = transformedImage.grayscale();
+
+          break;
+        }
+
+        case 'tint': {
+          transformedImage = transformedImage.tint(tint);
+
+          break;
+        }
+
+        default:
+          throw new BadRequestException(`Unsupported transformation: ${step}`);
+      }
+    }
+
+    return await transformedImage.toBuffer();
+  };
+
+  async process(job: Job) {
+    const {
+      data: { userId, image, transformImageDto, transformedImageCacheKey },
+    } = job;
+
+    try {
+      const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
+      const transformedImageBuffer = await this.transformImage(
+        imageBuffer,
+        transformImageDto,
+      );
+      const expressMulterFile = {
+        buffer: transformedImageBuffer,
+        originalname: image.originalName,
+        mimetype: `image/${image.format}`,
+      } as Express.Multer.File;
+      const key = await this.awsS3Service.uploadFile(
+        expressMulterFile,
+        `${userId}/transformations`,
+      );
+      const transformedImage = await this.prismaService.transformedImage.create(
+        {
+          data: {
+            originalImageId: image.id,
+            key,
+            transformation: transformImageDto as unknown as InputJsonObject,
+          },
+        },
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { key: _, ...rest } = transformedImage;
+      const response = {
+        ...rest,
+        url:
+          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+      };
+
+      await this.cacheManager.set(transformedImageCacheKey, response);
+
+      return response;
+    } catch (error) {
+      this.handleError(error, 'process job');
+    }
+  }
+
+  @OnWorkerEvent('completed')
+  onCompleted(job: Job, result: any) {
+    Logger.log(`Job with ID ${job.id} completed`, ImagesProcessor.name);
+
+    this.notificationsGateway.emitToUser(
+      job.data.userId,
+      `${job.id}-completed`,
+      result,
+    );
+  }
+
+  @OnWorkerEvent('failed')
+  onFailed(job: Job, error: Error) {
+    Logger.error(
+      `Job with ID ${job.id} failed`,
+      error.stack,
+      ImagesProcessor.name,
+    );
+
+    this.notificationsGateway.emitToUser(
+      job.data.userId,
+      `${job.id}-failed`,
+      error.message,
+    );
+  }
+}
