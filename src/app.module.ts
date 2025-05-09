@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { ImagesModule } from './images/images.module';
 import { AwsS3Service } from './aws-s3/aws-s3.service';
 import { TransformedImagesModule } from './transformed-images/transformed-images.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { TransformedImagesModule } from './transformed-images/transformed-images
         },
       }),
     }),
+    JobsModule,
   ],
   controllers: [],
   providers: [PrismaService, AwsS3Service],
