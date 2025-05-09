@@ -9,13 +9,14 @@ import {
   ForbiddenException,
   Inject,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 
 import { TransformImageDto } from './dto/transform-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InputJsonObject } from 'generated/prisma/runtime/library';
-import { ImagesGateway } from './images.gateway';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 
 @Processor('images', { concurrency: 2 })
 export class ImagesProcessor extends WorkerHost {
@@ -24,7 +25,7 @@ export class ImagesProcessor extends WorkerHost {
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private readonly imagesGateway: ImagesGateway,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {
     super();
   }
@@ -156,9 +157,9 @@ export class ImagesProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job, result: any) {
-    console.log(`Job with ID ${job.id} completed`);
+    Logger.log(`Job with ID ${job.id} completed`, ImagesProcessor.name);
 
-    this.imagesGateway.emitToUser(
+    this.notificationsGateway.emitToUser(
       job.data.userId,
       'image-transformation-completed',
       result,
@@ -167,9 +168,13 @@ export class ImagesProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
-    console.error(`Job with ID ${job.id} failed`);
+    Logger.error(
+      `Job with ID ${job.id} failed`,
+      error.stack,
+      ImagesProcessor.name,
+    );
 
-    this.imagesGateway.emitToUser(
+    this.notificationsGateway.emitToUser(
       job.data.userId,
       'image-transformation-failed',
       error.message,

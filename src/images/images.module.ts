@@ -7,8 +7,8 @@ import { ImagesController } from './images.controller';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ImagesProcessor } from './images.processor';
-import { ImagesGateway } from './images.gateway';
 import { AuthService } from 'src/auth/auth.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'images' })],
@@ -18,9 +18,9 @@ import { AuthService } from 'src/auth/auth.service';
     AwsS3Service,
     PrismaService,
     ImagesProcessor,
-    ImagesGateway,
     JwtService,
     AuthService,
+    NotificationsGateway,
   ],
 })
 export class ImagesModule {}
