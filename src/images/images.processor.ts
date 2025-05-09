@@ -161,7 +161,7 @@ export class ImagesProcessor extends WorkerHost {
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      'image-transformation-completed',
+      `${job.id}-completed`,
       result,
     );
   }
@@ -176,7 +176,7 @@ export class ImagesProcessor extends WorkerHost {
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      'image-transformation-failed',
+      `${job.id}-failed`,
       error.message,
     );
   }
