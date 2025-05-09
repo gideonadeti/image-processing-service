@@ -9,6 +9,7 @@ import { TransformedImagesProcessor } from './transformed-images.processor';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { AuthService } from 'src/auth/auth.service';
 import { JwtService } from '@nestjs/jwt';
+import { TransformedImagesEventsListener } from './transformed-images.events.listener';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'transformed-images' })],
@@ -21,6 +22,7 @@ import { JwtService } from '@nestjs/jwt';
     NotificationsGateway,
     AuthService,
     JwtService,
+    TransformedImagesEventsListener,
   ],
 })
 export class TransformedImagesModule {}
