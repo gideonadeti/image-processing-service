@@ -13,6 +13,7 @@ A service that allows users to upload and process images
   - Grayscale
   - Tint
 - Image search with filtering, sorting, and pagination
+- Caching of transformation requests with Redis
 - Message queuing with BullMQ for image processing tasks
 - Real-time notifications with WebSockets (via Socket.IO)
 - Job polling endpoint for accessing jobs
@@ -24,7 +25,8 @@ A service that allows users to upload and process images
 - **Auth:** Passport + JWT + Cookies
 - **Image Processing:** sharp
 - **File Storage:** AWS S3
-- **Message queuing:** BullMQ
+- **Caching:** In-memory (via Cache Manager)
+- **Message queuing:** BullMQ + Redis
 - **Real-time notifications:** WebSockets (via Socket.IO)
 - **Deployment:** Render
 
