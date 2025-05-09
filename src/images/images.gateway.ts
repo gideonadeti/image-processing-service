@@ -18,18 +18,27 @@ export class ImagesGateway
 {
   constructor(private readonly authService: AuthService) {}
 
+  private userSocketMap = new Map<string, string>();
+
   afterInit(server: Server) {
     server.use(wsJwtAuthMiddleware(this.authService));
 
     Logger.log('WebSocket server initialized');
   }
   handleConnection(client: Socket & { user: any }) {
-    console.log(`Client with id ${client.id} connected`);
-    console.log('User', client.user);
+    const userId = client.user.id;
+
+    this.userSocketMap.set(userId, client.id);
+
+    Logger.log(`Client with id ${client.id} connected`, ImagesGateway.name);
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Client with id ${client.id} disconnected`);
+  handleDisconnect(client: Socket & { user: any }) {
+    const userId = client.user.id;
+
+    this.userSocketMap.delete(userId);
+
+    Logger.log(`Client with id ${client.id} disconnected`, ImagesGateway.name);
   }
 
   @SubscribeMessage('message')
