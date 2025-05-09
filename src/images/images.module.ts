@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ImagesProcessor } from './images.processor';
 import { AuthService } from 'src/auth/auth.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { ImagesEventsListener } from './images.events.listener';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'images' })],
@@ -21,6 +22,7 @@ import { NotificationsGateway } from 'src/notifications/notifications.gateway';
     JwtService,
     AuthService,
     NotificationsGateway,
+    ImagesEventsListener,
   ],
 })
 export class ImagesModule {}
