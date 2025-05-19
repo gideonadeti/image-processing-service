@@ -64,8 +64,7 @@ REDIS_PASSWORD="<your-redis-password>"
 ## Prisma Setup
 
 ```bash
-npx prisma generate
-npx prisma migrate dev --name init
+npx prisma db push
 ```
 
 ## Run the Project
