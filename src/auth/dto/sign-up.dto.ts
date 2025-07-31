@@ -5,6 +5,8 @@ export class SignUpDto {
    * User's name
    * @example "John Doe"
    */
+  @IsString()
+  @IsNotEmpty()
   name: string;
 
   /**
