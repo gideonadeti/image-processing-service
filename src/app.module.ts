@@ -1,3 +1,4 @@
+import KeyvRedis from '@keyv/redis';
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { minutes, ThrottlerModule } from '@nestjs/throttler';
@@ -29,7 +30,21 @@ import { JobsModule } from './jobs/jobs.module';
         },
       ],
     }),
-    CacheModule.register({ isGlobal: true }),
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const username = configService.get<string>('REDIS_USERNAME');
+        const password = configService.get<string>('REDIS_PASSWORD');
+        const host = configService.get<string>('REDIS_HOST');
+        const port = configService.get<number>('REDIS_PORT');
+        const redisUrl = `redis://${username}:${password}@${host}:${port}`;
+        return {
+          stores: [new KeyvRedis(redisUrl)],
+        };
+      },
+      inject: [ConfigService],
+      isGlobal: true,
+    }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
