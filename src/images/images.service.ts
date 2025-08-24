@@ -119,6 +119,7 @@ export class ImagesService {
         id,
         transformImageDto,
       );
+
       const transformedImage: TransformedImage = await this.cacheManager.get(
         transformedImageCacheKey,
       );
@@ -298,6 +299,8 @@ export class ImagesService {
     res: Response,
   ) {
     const { download } = query;
+
+    console.log(`Is download? ${download}`);
 
     try {
       const image = await this.prismaService.image.findUnique({
