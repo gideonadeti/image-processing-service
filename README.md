@@ -1,6 +1,6 @@
 # Image Processing Service
 
-A service that allows users to upload and process images
+A backend system similar to Cloudinary that allows users to upload images, apply transformations, and view or download the results.
 
 ## Features
 
