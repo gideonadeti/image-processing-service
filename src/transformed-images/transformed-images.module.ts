@@ -7,12 +7,15 @@ import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransformedImagesProcessor } from './transformed-images.processor';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
-import { AuthService } from 'src/auth/auth.service';
+import { AuthModule } from 'src/auth/auth.module';
 import { JwtService } from '@nestjs/jwt';
 import { TransformedImagesEventsListener } from './transformed-images.events.listener';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'transformed-images' })],
+  imports: [
+    BullModule.registerQueue({ name: 'transformed-images' }),
+    AuthModule,
+  ],
   controllers: [TransformedImagesController],
   providers: [
     TransformedImagesService,
@@ -20,7 +23,6 @@ import { TransformedImagesEventsListener } from './transformed-images.events.lis
     PrismaService,
     TransformedImagesProcessor,
     NotificationsGateway,
-    AuthService,
     JwtService,
     TransformedImagesEventsListener,
   ],

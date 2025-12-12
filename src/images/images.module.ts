@@ -7,12 +7,12 @@ import { ImagesController } from './images.controller';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ImagesProcessor } from './images.processor';
-import { AuthService } from 'src/auth/auth.service';
+import { AuthModule } from 'src/auth/auth.module';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { ImagesEventsListener } from './images.events.listener';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'images' })],
+  imports: [BullModule.registerQueue({ name: 'images' }), AuthModule],
   controllers: [ImagesController],
   providers: [
     ImagesService,
@@ -20,7 +20,6 @@ import { ImagesEventsListener } from './images.events.listener';
     PrismaService,
     ImagesProcessor,
     JwtService,
-    AuthService,
     NotificationsGateway,
     ImagesEventsListener,
   ],
