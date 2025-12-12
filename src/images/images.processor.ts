@@ -13,19 +13,19 @@ import {
 } from '@nestjs/common';
 
 import { TransformImageDto } from './dto/transform-image.dto';
-import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InputJsonObject } from '@prisma/client/runtime/library';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { ImagesService } from './images.service';
 
 @Processor('images', { concurrency: 2 })
 export class ImagesProcessor extends WorkerHost {
   constructor(
-    private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly imagesService: ImagesService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     super();
   }
@@ -111,11 +111,14 @@ export class ImagesProcessor extends WorkerHost {
 
   async process(job: Job) {
     const {
-      data: { userId, image, transformImageDto, transformedImageCacheKey },
+      data: { image, transformImageDto, transformedImageCacheKey },
     } = job;
 
     try {
-      const imageBuffer = await this.awsS3Service.getFileBuffer(image.key);
+      const imageBuffer = await this.imagesService.getFileBufferFromCloudinary(
+        image.secureUrl,
+      );
+
       const transformedImageBuffer = await this.transformImage(
         imageBuffer,
         transformImageDto,
@@ -126,31 +129,27 @@ export class ImagesProcessor extends WorkerHost {
         originalname: image.originalName,
         mimetype: `image/${image.format}`,
       } as Express.Multer.File;
-      const key = await this.awsS3Service.uploadFile(
-        expressMulterFile,
-        `${userId}/transformations`,
-      );
+
+      const { publicId, secureUrl } =
+        await this.imagesService.uploadImageToCloudinary(expressMulterFile);
+
       const transformedImage = await this.prismaService.transformedImage.create(
         {
           data: {
             originalImageId: image.id,
-            key,
+            publicId,
+            secureUrl,
             transformation: transformImageDto as unknown as InputJsonObject,
           },
         },
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: _, ...rest } = transformedImage;
-      const response = {
-        ...rest,
-        url:
-          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
-      };
+      const { publicId: _, ...rest } = transformedImage;
 
-      await this.cacheManager.set(transformedImageCacheKey, response);
+      await this.cacheManager.set(transformedImageCacheKey, rest);
 
-      return response;
+      return rest;
     } catch (error) {
       this.handleError(error, 'process job');
     }
