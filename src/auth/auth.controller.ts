@@ -7,7 +7,8 @@ import { SignInDto } from './dto/sign-in.dto';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { RefreshTokenGuard } from './refresh-token.guard';
+import { RefreshJwtAuthGuard } from './refresh-jwt-auth.guard';
+import { User } from '@prisma/client';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -22,11 +23,14 @@ export class AuthController {
   @ApiBody({ type: SignInDto })
   @UseGuards(LocalAuthGuard)
   @Post('sign-in')
-  async signIn(@Req() req: Request, @Res() res: Response) {
+  async signIn(
+    @Req() req: Request & { user: Partial<User> },
+    @Res() res: Response,
+  ) {
     return this.authService.signIn(req.user, res);
   }
 
-  @UseGuards(RefreshTokenGuard)
+  @UseGuards(RefreshJwtAuthGuard)
   @Post('refresh')
   async refresh(@Req() req: Request, @Res() res: Response) {
     return this.authService.refresh(req, res);
@@ -35,7 +39,10 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('sign-out')
-  async signOut(@Req() req: Request, @Res() res: Response) {
+  async signOut(
+    @Req() req: Request & { user: Partial<User> },
+    @Res() res: Response,
+  ) {
     return this.authService.signOut(req.user, res);
   }
 }

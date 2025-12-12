@@ -8,7 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
-import { JwtRefreshStrategy } from './jwt-refresh.strategy';
+import { RefreshJwtStrategy } from './refresh-jwt.strategy';
 
 @Module({
   imports: [
@@ -26,7 +26,7 @@ import { JwtRefreshStrategy } from './jwt-refresh.strategy';
     AuthService,
     LocalStrategy,
     JwtStrategy,
-    JwtRefreshStrategy,
+    RefreshJwtStrategy,
     PrismaService,
   ],
   controllers: [AuthController],
