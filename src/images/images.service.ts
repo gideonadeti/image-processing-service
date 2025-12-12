@@ -18,7 +18,7 @@ import { Response } from 'express';
 import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
 import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
-import { TransformedImage } from 'generated/prisma';
+import { TransformedImage } from '@prisma/client';
 
 @Injectable()
 export class ImagesService {

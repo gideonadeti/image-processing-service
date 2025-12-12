@@ -15,7 +15,7 @@ import {
 import { TransformImageDto } from './dto/transform-image.dto';
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { InputJsonObject } from 'generated/prisma/runtime/library';
+import { InputJsonObject } from '@prisma/client/runtime/library';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 
 @Processor('images', { concurrency: 2 })

@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { InputJsonObject } from '@prisma/client/runtime/library';
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,7 +15,6 @@ import {
 
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { InputJsonObject } from 'generated/prisma/runtime/library';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 

@@ -5,6 +5,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { TransformedImage } from '@prisma/client';
 import {
   BadRequestException,
   ForbiddenException,
@@ -17,7 +18,6 @@ import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
-import { TransformedImage } from 'generated/prisma';
 
 @Injectable()
 export class TransformedImagesService {
