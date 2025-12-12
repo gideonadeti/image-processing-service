@@ -63,6 +63,7 @@ model TransformedImage {
   originalImageId String   @db.ObjectId
   publicId        String
   secureUrl       String
+  size            Int
   transformation  Json
   parentId        String?  @db.ObjectId
   createdAt       DateTime @default(now())
