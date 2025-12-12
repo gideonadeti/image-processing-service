@@ -48,6 +48,7 @@ export class NotificationsGateway
     );
   }
 
+  // TODO: ensure that user is connected before emitting
   emitToUser(userId: string, event: string, payload: any) {
     const socketId = this.userSocketMap.get(userId);
 

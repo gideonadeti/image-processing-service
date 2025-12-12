@@ -120,6 +120,7 @@ export class ImagesProcessor extends WorkerHost {
         imageBuffer,
         transformImageDto,
       );
+
       const expressMulterFile = {
         buffer: transformedImageBuffer,
         originalname: image.originalName,
