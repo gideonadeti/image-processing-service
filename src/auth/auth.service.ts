@@ -1,7 +1,9 @@
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
-import { Request, Response } from 'express';
+import { CookieOptions, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { ConfigService } from '@nestjs/config';
+import { Prisma, User } from '@prisma/client';
 import { Socket } from 'socket.io';
 import {
   ConflictException,
@@ -10,66 +12,61 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
-import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, User } from 'generated/prisma';
 import { SignUpDto } from './dto/sign-up.dto';
-
-interface AuthPayload {
-  email: string;
-  sub: string;
-  jti: string;
-}
+import { PrismaService } from 'src/prisma/prisma.service';
+import { AuthPayload } from './auth-payload.interface';
 
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     private prismaService: PrismaService,
-    private readonly configService: ConfigService,
+    private configService: ConfigService,
   ) {}
 
   private logger = new Logger(AuthService.name);
 
+  /**
+   * Generates access & refresh tokens, persists the hashed refresh token,
+   * sets the refresh cookie, and sends the response.
+   */
   private async handleSuccessfulAuth(
     user: Partial<User>,
     res: Response,
     statusCode: number = 200,
   ) {
-    const payload = this.createAuthPayload(user);
+    const payload = this.createAuthPayload(user) as AuthPayload;
     const accessToken = this.getToken(payload, 'access');
     const refreshToken = this.getToken(payload, 'refresh');
+    const salt = await bcrypt.genSalt(10);
+    const hashedToken = await bcrypt.hash(refreshToken, salt);
+    const userId = user.id as string;
+    const existingRefreshToken =
+      await this.prismaService.refreshToken.findUnique({
+        where: { userId },
+      });
 
-    try {
-      const existingRefreshToken =
-        await this.prismaService.refreshToken.findUnique({
-          where: { userId: user.id },
-        });
-
-      const salt = await bcrypt.genSalt(10);
-      const hashedToken = await bcrypt.hash(refreshToken, salt);
-
-      if (existingRefreshToken) {
-        await this.prismaService.refreshToken.update({
-          where: { userId: user.id },
-          data: { token: hashedToken },
-        });
-      } else {
-        await this.prismaService.refreshToken.create({
-          data: { userId: user.id, token: hashedToken },
-        });
-      }
-
-      res.cookie('refreshToken', refreshToken, this.getRefreshCookieConfig());
-      res.status(statusCode).json({ accessToken, user });
-    } catch (error) {
-      throw error;
+    if (existingRefreshToken) {
+      await this.prismaService.refreshToken.update({
+        where: { userId },
+        data: { value: hashedToken },
+      });
+    } else {
+      await this.prismaService.refreshToken.create({
+        data: { userId, value: hashedToken },
+      });
     }
+
+    res.cookie('refreshToken', refreshToken, this.getRefreshCookieConfig());
+    res.status(statusCode).json({
+      accessToken,
+      user,
+    });
   }
 
-  private handleAuthError(error: any, action: string) {
-    this.logger.error(`Failed to ${action}:`, error);
+  private handleError(error: any, action: string) {
+    this.logger.error(`Failed to ${action}`, (error as Error).stack);
 
     if (error instanceof UnauthorizedException) {
       throw error;
@@ -77,45 +74,55 @@ export class AuthService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      throw new ConflictException('Email is already in use.');
+      throw new ConflictException('Email is already in use');
     }
 
     throw new InternalServerErrorException(`Failed to ${action}`);
   }
 
   private createAuthPayload(user: Partial<User>) {
-    return { email: user.email, sub: user.id, jti: uuidv4() };
-  }
-
-  private getRefreshCookieConfig() {
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-
     return {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'strict' as const,
-      path: '/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sub: user.id,
+      name: user.name,
+      email: user.email,
+      jti: uuidv4(),
     };
   }
 
   private getToken(payload: AuthPayload, type: 'access' | 'refresh') {
-    return this.jwtService.sign(payload, {
-      ...(type === 'refresh' && {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: '7d',
-      }),
-    });
-  }
-  private async hashPassword(password: string): Promise<string> {
-    try {
-      const salt = await bcrypt.genSalt(10);
+    if (type === 'refresh') {
+      const secret =
+        this.configService.get<string>('JWT_REFRESH_SECRET') ??
+        process.env.JWT_REFRESH_SECRET;
 
-      return bcrypt.hash(password, salt);
-    } catch (error) {
-      throw error;
+      return this.jwtService.sign(payload, {
+        secret,
+        expiresIn: '7d',
+      });
     }
+
+    // Access tokens use the default secret configured in JwtModule
+    return this.jwtService.sign(payload);
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = await bcrypt.genSalt(10);
+
+    return bcrypt.hash(password, salt);
+  }
+
+  private getRefreshCookieConfig(): CookieOptions {
+    const nodeEnv =
+      this.configService.get<string>('NODE_ENV') ?? process.env.NODE_ENV;
+    const isProd = nodeEnv === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
   }
 
   async signUp(signUpDto: SignUpDto, res: Response) {
@@ -129,11 +136,11 @@ export class AuthService {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
+      const { password, ...rest } = user;
 
-      await this.handleSuccessfulAuth(result, res, 201);
+      await this.handleSuccessfulAuth(rest, res, 201);
     } catch (error) {
-      this.handleAuthError(error, 'sign up user');
+      this.handleError(error, 'sign up user');
     }
   }
 
@@ -141,13 +148,18 @@ export class AuthService {
     try {
       await this.handleSuccessfulAuth(user, res);
     } catch (error) {
-      this.handleAuthError(error, 'sign in user');
+      this.handleError(error, 'sign in user');
     }
   }
 
   async refresh(req: Request, res: Response) {
     const user = req.user as Partial<User>;
-    const refreshTokenFromCookie = req.cookies['refreshToken'];
+    const refreshTokenFromCookie = (req.cookies as { refreshToken?: string })
+      ?.refreshToken;
+
+    if (!refreshTokenFromCookie) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
 
     try {
       const existingRefreshToken =
@@ -161,54 +173,48 @@ export class AuthService {
 
       const isCorrectRefreshToken = await bcrypt.compare(
         refreshTokenFromCookie,
-        existingRefreshToken.token,
+        existingRefreshToken.value,
       );
 
       if (!isCorrectRefreshToken) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      const payload = this.createAuthPayload(user);
-      const accessToken = this.getToken(payload, 'access');
-
-      res.json({ accessToken });
+      await this.handleSuccessfulAuth(user, res);
     } catch (error) {
-      this.handleAuthError(error, 'refresh token');
+      this.handleError(error, 'refresh token');
     }
   }
 
   async signOut(user: Partial<User>, res: Response) {
     try {
-      await this.prismaService.refreshToken.delete({
+      // Use deleteMany so it doesn't throw an error if the user has no refresh token, thus has already signed out
+      await this.prismaService.refreshToken.deleteMany({
         where: { userId: user.id },
       });
 
       res.clearCookie('refreshToken', this.getRefreshCookieConfig());
       res.sendStatus(200);
     } catch (error) {
-      this.handleAuthError(error, 'sign out user');
+      this.handleError(error, 'sign out user');
     }
   }
 
   async validateUser(email: string, pass: string) {
-    try {
-      const user = await this.prismaService.user.findUnique({
-        where: { email },
-      });
+    const user = await this.prismaService.user.findUnique({
+      where: { email },
+    });
 
-      if (!user) return null;
+    if (!user) return null;
 
-      const isCorrectPassword = await bcrypt.compare(pass, user.password);
+    const isCorrectPassword = await bcrypt.compare(pass, user.password);
 
-      if (!isCorrectPassword) return null;
+    if (!isCorrectPassword) return null;
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...rest } = user;
 
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    return rest;
   }
 
   async validateClient(client: Socket & { user: any }) {
