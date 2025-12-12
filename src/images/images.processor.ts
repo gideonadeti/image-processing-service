@@ -124,10 +124,14 @@ export class ImagesProcessor extends WorkerHost {
         transformImageDto,
       );
 
+      // Get the size of the transformed image buffer
+      const transformedImageSize = transformedImageBuffer.length;
+
       const expressMulterFile = {
         buffer: transformedImageBuffer,
         originalname: image.originalName,
         mimetype: `image/${image.format}`,
+        size: transformedImageSize,
       } as Express.Multer.File;
 
       const { publicId, secureUrl } =
@@ -139,6 +143,7 @@ export class ImagesProcessor extends WorkerHost {
             originalImageId: image.id,
             publicId,
             secureUrl,
+            size: transformedImageSize,
             transformation: transformImageDto as unknown as InputJsonObject,
           },
         },
