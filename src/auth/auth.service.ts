@@ -5,7 +5,6 @@ import { CookieOptions, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
 import { PasswordResetToken, Prisma, User } from '@prisma/client';
-import { Socket } from 'socket.io';
 import {
   ConflictException,
   Injectable,
@@ -220,19 +219,16 @@ export class AuthService {
     return rest;
   }
 
-  async validateClient(client: Socket & { user: any }) {
-    const authHeader = client.handshake.headers['authorization'];
-    const token = authHeader?.split(' ')[1];
+  validateToken(token: string) {
+    try {
+      const payload = this.jwtService.verify<AuthPayload>(token, {
+        secret: this.configService.get('JWT_ACCESS_SECRET'),
+      });
 
-    if (!token) {
-      throw new UnauthorizedException('No token provided');
+      return { id: payload.sub };
+    } catch (error) {
+      this.handleError(error, 'validate token');
     }
-
-    const payload = this.jwtService.verify<AuthPayload>(token, {
-      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-    });
-
-    client.user = payload;
   }
 
   async forgotPassword(email: string) {
