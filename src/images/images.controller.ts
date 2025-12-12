@@ -1,5 +1,6 @@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import {
@@ -88,7 +89,11 @@ export class ImagesController {
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+    }),
+  )
   create(
     @UserId() userId: string,
     @UploadedFile(
@@ -101,51 +106,51 @@ export class ImagesController {
         })
         .build(),
     )
-    file: Express.Multer.File,
+    image: Express.Multer.File,
   ) {
-    return this.imagesService.create(userId, file);
+    return this.imagesService.create(userId, image);
   }
 
-  @UseGuards(ThrottlerGuard)
-  @Post(':id/transform')
-  transform(
-    @UserId() userId: string,
-    @Param('id') id: string,
-    @Body() transformImageDto: TransformImageDto,
-  ) {
-    this.validateTransformations(transformImageDto);
-    this.validateOrderIntegrity(transformImageDto);
+  // @UseGuards(ThrottlerGuard)
+  // @Post(':id/transform')
+  // transform(
+  //   @UserId() userId: string,
+  //   @Param('id') id: string,
+  //   @Body() transformImageDto: TransformImageDto,
+  // ) {
+  //   this.validateTransformations(transformImageDto);
+  //   this.validateOrderIntegrity(transformImageDto);
 
-    return this.imagesService.transform(userId, id, transformImageDto);
-  }
+  //   return this.imagesService.transform(userId, id, transformImageDto);
+  // }
 
   @Get()
-  findAll(@UserId() userId: string, @Query() query: FindAllImagesDto) {
-    return this.imagesService.findAll(userId, query);
+  findAll(@UserId() userId: string) {
+    return this.imagesService.findAll(userId);
   }
 
-  @Get(':id')
-  findOne(@UserId() userId: string, @Param('id') id: string) {
-    return this.imagesService.findOne(userId, id);
-  }
+  // @Get(':id')
+  // findOne(@UserId() userId: string, @Param('id') id: string) {
+  //   return this.imagesService.findOne(userId, id);
+  // }
 
-  @Public()
-  @Get(':id/view')
-  viewOrDownload(
-    @Param('id') id: string,
-    @Query() query: ViewOrDownloadImageDto,
-    @Res() res: Response,
-  ) {
-    return this.imagesService.viewOrDownload(id, query, res);
-  }
+  // @Public()
+  // @Get(':id/view')
+  // viewOrDownload(
+  //   @Param('id') id: string,
+  //   @Query() query: ViewOrDownloadImageDto,
+  //   @Res() res: Response,
+  // ) {
+  //   return this.imagesService.viewOrDownload(id, query, res);
+  // }
 
-  @Get(':id/transformed')
-  findAllTransformed(@UserId() userId: string, @Param('id') id: string) {
-    return this.imagesService.findAllTransformed(userId, id);
-  }
+  // @Get(':id/transformed')
+  // findAllTransformed(@UserId() userId: string, @Param('id') id: string) {
+  //   return this.imagesService.findAllTransformed(userId, id);
+  // }
 
-  @Delete(':id')
-  remove(@UserId() userId: string, @Param('id') id: string) {
-    return this.imagesService.remove(userId, id);
-  }
+  // @Delete(':id')
+  // remove(@UserId() userId: string, @Param('id') id: string) {
+  //   return this.imagesService.remove(userId, id);
+  // }
 }

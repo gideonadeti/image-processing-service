@@ -3,6 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { v2 as cloudinary } from 'cloudinary';
 import {
   BadRequestException,
   ForbiddenException,
@@ -28,7 +29,23 @@ export class ImagesService {
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue('images') private imagesQueue: Queue,
-  ) {}
+  ) {
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
+    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
+    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new InternalServerErrorException(
+        'Missing required Cloudinary environment variables',
+      );
+    }
+
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    });
+  }
 
   private readonly baseUrl = this.configService.get<string>('BASE_URL');
 
@@ -65,302 +82,265 @@ export class ImagesService {
     return `${userId}:transformations:${imageId}-${hash}`;
   }
 
+  private async uploadImageToCloudinary(
+    image: Express.Multer.File,
+    folder = 'Bildtransformator-Images',
+  ) {
+    try {
+      // Upload from buffer using data URI format for Cloudinary
+      const dataUri = `data:${image.mimetype};base64,${image.buffer.toString('base64')}`;
+      const response = await cloudinary.uploader.upload(dataUri, {
+        folder,
+      });
+
+      return {
+        publicId: response.public_id,
+        secureUrl: response.secure_url,
+      };
+    } catch (error) {
+      this.handleError(
+        error,
+        `upload image with original name '${image.originalname}' to folder '${folder}'`,
+      );
+    }
+  }
+
   async create(userId: string, file: Express.Multer.File) {
     const format = file.mimetype.split('/')[1];
 
     try {
-      const key = await this.awsS3Service.uploadFile(file, userId);
+      const { publicId, secureUrl } = await this.uploadImageToCloudinary(file);
       const image = await this.prismaService.image.create({
         data: {
           userId,
           originalName: file.originalname,
           size: file.size,
           format,
-          key,
+          publicId,
+          secureUrl,
         },
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: _a, userId: _b, ...rest } = image;
+      const { publicId: _, ...rest } = image;
 
       return {
         ...rest,
-        url: this.baseUrl + '/images/' + image.id + '/view',
       };
     } catch (error) {
       this.handleError(error, 'upload image');
     }
   }
 
-  async transform(
-    userId: string,
-    id: string,
-    transformImageDto: TransformImageDto,
-  ) {
+  // async transform(
+  //   userId: string,
+  //   id: string,
+  //   transformImageDto: TransformImageDto,
+  // ) {
+  //   try {
+  //     const image = await this.prismaService.image.findUnique({
+  //       where: {
+  //         id,
+  //       },
+  //     });
+
+  //     if (!image) {
+  //       throw new BadRequestException('Image not found');
+  //     }
+
+  //     if (image.userId !== userId) {
+  //       throw new ForbiddenException(
+  //         'You are not authorized to transform this image',
+  //       );
+  //     }
+
+  //     const transformedImageCacheKey = this.generateTransformedImageCacheKey(
+  //       userId,
+  //       id,
+  //       transformImageDto,
+  //     );
+
+  //     const transformedImage: TransformedImage = await this.cacheManager.get(
+  //       transformedImageCacheKey,
+  //     );
+
+  //     if (transformedImage) {
+  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //       const { publicId: _, ...rest } = transformedImage;
+
+  //       return {
+  //         ...rest,
+  //       };
+  //     }
+
+  //     const job = await this.imagesQueue.add('transform', {
+  //       userId,
+  //       image,
+  //       transformImageDto,
+  //       transformedImageCacheKey,
+  //     });
+
+  //     return {
+  //       jobId: job.id,
+  //       status: 'queued',
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error, 'transform image');
+  //   }
+  // }
+
+  async findAll(userId: string) {
     try {
-      const image = await this.prismaService.image.findUnique({
-        where: {
-          id,
-        },
-      });
-
-      if (!image) {
-        throw new BadRequestException('Image not found');
-      }
-
-      if (image.userId !== userId) {
-        throw new ForbiddenException(
-          'You are not authorized to transform this image',
-        );
-      }
-
-      const transformedImageCacheKey = this.generateTransformedImageCacheKey(
-        userId,
-        id,
-        transformImageDto,
-      );
-
-      const transformedImage: TransformedImage = await this.cacheManager.get(
-        transformedImageCacheKey,
-      );
-
-      if (transformedImage) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { key: _, ...rest } = transformedImage;
-
-        return {
-          ...rest,
-          url:
-            this.baseUrl +
-            '/transformed-images/' +
-            transformedImage.id +
-            '/view',
-        };
-      }
-
-      const job = await this.imagesQueue.add('transform', {
-        userId,
-        image,
-        transformImageDto,
-        transformedImageCacheKey,
-      });
-
-      return {
-        jobId: job.id,
-        status: 'queued',
-      };
-    } catch (error) {
-      this.handleError(error, 'transform image');
-    }
-  }
-
-  async findAll(userId: string, query: FindAllImagesDto) {
-    const { originalName, minSize, maxSize, sortBy, order, limit, page } =
-      query;
-
-    const whereConditions: any = {};
-
-    if (originalName) {
-      whereConditions.originalName = {
-        contains: originalName,
-        mode: 'insensitive',
-      };
-    }
-
-    if (minSize !== undefined || maxSize !== undefined) {
-      whereConditions.size = {};
-
-      if (minSize !== undefined) {
-        whereConditions.size.gte = Number(minSize) * 1024 * 1024; // Convert MB to bytes
-      }
-      if (maxSize !== undefined) {
-        whereConditions.size.lte = Number(maxSize) * 1024 * 1024;
-      }
-    }
-
-    try {
-      if (!page && !limit) {
-        const images = await this.prismaService.image.findMany({
-          where: {
-            userId,
-          },
-        });
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        return images.map(({ key, userId, ...rest }) => ({
-          ...rest,
-          url: this.baseUrl + '/images/' + rest.id + '/view',
-        }));
-      }
-
-      const numberPage = page ? Number(page) : 1;
-      const numberLimit = limit ? Number(limit) : 10;
-      const total = await this.prismaService.image.count({
-        where: whereConditions,
-      });
-      const lastPage = Math.ceil(total / numberLimit);
       const images = await this.prismaService.image.findMany({
-        where: whereConditions,
-        orderBy: {
-          [sortBy]: order,
+        where: {
+          userId,
         },
-        skip: (numberPage - 1) * numberLimit,
-        take: numberLimit,
       });
-      const imagesWithUrl = images.map((image) => ({
-        ...image,
-        url: this.baseUrl + '/images/' + image.id + '/view',
-      }));
 
-      return {
-        imagesWithUrl,
-        meta: {
-          total,
-          page: numberPage,
-          lastPage,
-          hasNextPage: numberPage < lastPage,
-          hasPreviousPage: numberPage > 1,
-        },
-      };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return images.map(({ publicId, ...rest }) => ({
+        ...rest,
+      }));
     } catch (error) {
       this.handleError(error, `'fetch images for user with ID ${userId}'`);
     }
   }
 
-  async findOne(userId: string, id: string) {
-    try {
-      const image = await this.prismaService.image.findUnique({
-        where: {
-          id,
-        },
-      });
+  // async findOne(userId: string, id: string) {
+  //   try {
+  //     const image = await this.prismaService.image.findUnique({
+  //       where: {
+  //         id,
+  //       },
+  //     });
 
-      if (!image) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
-      }
+  //     if (!image) {
+  //       throw new BadRequestException(`Image with ID ${id} not found`);
+  //     }
 
-      if (image.userId !== userId) {
-        throw new ForbiddenException(
-          'You are not authorized to view this image',
-        );
-      }
+  //     if (image.userId !== userId) {
+  //       throw new ForbiddenException(
+  //         'You are not authorized to view this image',
+  //       );
+  //     }
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, userId: _, ...rest } = image;
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //     const { publicId, userId: _, ...rest } = image;
 
-      return {
-        ...rest,
-        url: this.baseUrl + '/images/' + image.id + '/view',
-      };
-    } catch (error) {
-      this.handleError(error, `fetch image with ID ${id}`);
-    }
-  }
+  //     return {
+  //       ...rest,
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error, `fetch image with ID ${id}`);
+  //   }
+  // }
 
-  async findAllTransformed(userId: string, id: string) {
-    try {
-      const image = await this.prismaService.image.findUnique({
-        where: {
-          id,
-        },
-        include: {
-          transformedImages: true,
-        },
-      });
+  // async findAllTransformed(userId: string, id: string) {
+  //   try {
+  //     const image = await this.prismaService.image.findUnique({
+  //       where: {
+  //         id,
+  //       },
+  //       include: {
+  //         transformedImages: true,
+  //       },
+  //     });
 
-      if (!image) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
-      }
+  //     if (!image) {
+  //       throw new BadRequestException(`Image with ID ${id} not found`);
+  //     }
 
-      if (image.userId !== userId) {
-        throw new ForbiddenException(
-          'You are not authorized to view transformed images of this image',
-        );
-      }
+  //     if (image.userId !== userId) {
+  //       throw new ForbiddenException(
+  //         'You are not authorized to view transformed images of this image',
+  //       );
+  //     }
 
-      const { transformedImages } = image;
+  //     const { transformedImages } = image;
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      return transformedImages.map(({ key, originalImageId, ...rest }) => ({
-        ...rest,
-        url: this.baseUrl + '/transformed-images/' + rest.id + '/view',
-      }));
-    } catch (error) {
-      this.handleError(
-        error,
-        `fetch transformed images of image with ID ${id}`,
-      );
-    }
-  }
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //     return transformedImages.map(
+  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //       ({ publicId: _, originalImageId: _, ...rest }) => ({
+  //         ...rest,
+  //       }),
+  //     );
+  //   } catch (error) {
+  //     this.handleError(
+  //       error,
+  //       `fetch transformed images of image with ID ${id}`,
+  //     );
+  //   }
+  // }
 
-  async viewOrDownload(
-    id: string,
-    query: ViewOrDownloadImageDto,
-    res: Response,
-  ) {
-    const { download } = query;
+  // async viewOrDownload(
+  //   id: string,
+  //   query: ViewOrDownloadImageDto,
+  //   res: Response,
+  // ) {
+  //   const { download } = query;
 
-    console.log(`Is download? ${download}`);
+  //   console.log(`Is download? ${download}`);
 
-    try {
-      const image = await this.prismaService.image.findUnique({
-        where: {
-          id,
-        },
-      });
+  //   try {
+  //     const image = await this.prismaService.image.findUnique({
+  //       where: {
+  //         id,
+  //       },
+  //     });
 
-      if (!image) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
-      }
+  //     if (!image) {
+  //       throw new BadRequestException(`Image with ID ${id} not found`);
+  //     }
 
-      const stream = await this.awsS3Service.getFileStream(image.key);
+  //     const stream = await this.awsS3Service.getFileStream(image.publicId);
 
-      res.setHeader('Content-Type', 'image/' + image.format);
+  //     res.setHeader('Content-Type', 'image/' + image.format);
 
-      if (download) {
-        res.setHeader(
-          'Content-Disposition',
-          `attachment; filename="${image.originalName}"`,
-        );
-      } else {
-        res.setHeader('Content-Disposition', 'inline');
-      }
+  //     if (download) {
+  //       res.setHeader(
+  //         'Content-Disposition',
+  //         `attachment; filename="${image.originalName}"`,
+  //       );
+  //     } else {
+  //       res.setHeader('Content-Disposition', 'inline');
+  //     }
 
-      stream.pipe(res);
-    } catch (error) {
-      this.handleError(error, `view or download image with ID ${id}`);
-    }
-  }
+  //     stream.pipe(res);
+  //   } catch (error) {
+  //     this.handleError(error, `view or download image with ID ${id}`);
+  //   }
+  // }
 
-  async remove(userId: string, id: string) {
-    try {
-      const image = await this.prismaService.image.delete({
-        where: {
-          id,
-        },
-      });
+  // async remove(userId: string, id: string) {
+  //   try {
+  //     const image = await this.prismaService.image.delete({
+  //       where: {
+  //         id,
+  //       },
+  //     });
 
-      if (!image) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
-      }
+  //     if (!image) {
+  //       throw new BadRequestException(`Image with ID ${id} not found`);
+  //     }
 
-      if (image.userId !== userId) {
-        throw new ForbiddenException(
-          'You are not authorized to delete this image',
-        );
-      }
+  //     if (image.userId !== userId) {
+  //       throw new ForbiddenException(
+  //         'You are not authorized to delete this image',
+  //       );
+  //     }
 
-      await this.awsS3Service.deleteFile(image.key);
+  //     await this.awsS3Service.deleteFile(image.key);
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, userId: _, ...rest } = image;
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //     const { key, userId: _, ...rest } = image;
 
-      return {
-        ...rest,
-        url: this.baseUrl + '/images/' + image.id + '/view',
-      };
-    } catch (error) {
-      this.handleError(error, `delete image with ID ${id}`);
-    }
-  }
+  //     return {
+  //       ...rest,
+  //       url: this.baseUrl + '/images/' + image.id + '/view',
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error, `delete image with ID ${id}`);
+  //   }
+  // }
 }
