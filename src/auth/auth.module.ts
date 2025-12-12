@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { RefreshJwtStrategy } from './refresh-jwt.strategy';
+import { EmailService } from './email/email.service';
 
 @Module({
   imports: [
@@ -28,7 +29,9 @@ import { RefreshJwtStrategy } from './refresh-jwt.strategy';
     JwtStrategy,
     RefreshJwtStrategy,
     PrismaService,
+    EmailService,
   ],
   controllers: [AuthController],
+  exports: [AuthService],
 })
 export class AuthModule {}
