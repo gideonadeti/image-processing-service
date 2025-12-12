@@ -357,12 +357,12 @@ export class AuthService {
     try {
       const userId = user.id as string;
 
-      // Delete refresh tokens
+      // Delete refresh token
       await this.prismaService.refreshToken.deleteMany({
         where: { userId },
       });
 
-      // Delete password reset tokens
+      // Delete password reset token
       await this.prismaService.passwordResetToken.deleteMany({
         where: { userId },
       });
