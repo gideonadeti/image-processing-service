@@ -8,10 +8,23 @@ import {
 } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
 
-async function bootstrap() {
+const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const frontendBaseUrl = configService.get<string>(
+    'FRONTEND_BASE_URL',
+    'http://localhost:3001',
+  );
 
+  app.setGlobalPrefix('api/v1');
+  app.enableCors({
+    origin: frontendBaseUrl,
+    credentials: true,
+  });
+
+  app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -22,15 +35,14 @@ async function bootstrap() {
       },
     }),
   );
-  app.use(cookieParser());
 
   const config = new DocumentBuilder()
-    .setTitle('Image Processing Service')
-    .setDescription('A service that allows users to upload and process images.')
+    .setTitle('Bildtransformator')
+    .setDescription(
+      'A service similar to Cloudinary that allows users to upload images, apply transformations, and view or download the results.',
+    )
     .setVersion('1.0.0')
     .addBearerAuth()
-    .addTag('Auth')
-    .addTag('Images')
     .build();
 
   const options: SwaggerDocumentOptions = {
@@ -41,9 +53,9 @@ async function bootstrap() {
   const documentFactory = () =>
     SwaggerModule.createDocument(app, config, options);
 
-  SwaggerModule.setup('api/documentation', app, documentFactory);
+  SwaggerModule.setup('api/v1/documentation', app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
-}
+};
 
 bootstrap();
