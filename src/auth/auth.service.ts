@@ -10,8 +10,8 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import { jwtConstants } from './constants';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma, User } from 'generated/prisma';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -22,19 +22,12 @@ interface AuthPayload {
   jti: string;
 }
 
-const REFRESH_COOKIE_CONFIG = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  path: '/auth/refresh',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-};
-
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     private prismaService: PrismaService,
+    private readonly configService: ConfigService,
   ) {}
 
   private logger = new Logger(AuthService.name);
@@ -68,7 +61,7 @@ export class AuthService {
         });
       }
 
-      res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_CONFIG);
+      res.cookie('refreshToken', refreshToken, this.getRefreshCookieConfig());
       res.status(statusCode).json({ accessToken, user });
     } catch (error) {
       throw error;
@@ -94,10 +87,23 @@ export class AuthService {
     return { email: user.email, sub: user.id, jti: uuidv4() };
   }
 
+  private getRefreshCookieConfig() {
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict' as const,
+      path: '/auth/refresh',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+  }
+
   private getToken(payload: AuthPayload, type: 'access' | 'refresh') {
     return this.jwtService.sign(payload, {
       ...(type === 'refresh' && {
-        secret: jwtConstants.refreshSecret,
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: '7d',
       }),
     });
@@ -177,12 +183,7 @@ export class AuthService {
         where: { userId: user.id },
       });
 
-      res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict' as const,
-        path: '/auth/refresh',
-      });
+      res.clearCookie('refreshToken', this.getRefreshCookieConfig());
       res.sendStatus(200);
     } catch (error) {
       this.handleAuthError(error, 'sign out user');
@@ -219,7 +220,7 @@ export class AuthService {
     }
 
     const payload = this.jwtService.verify<AuthPayload>(token, {
-      secret: jwtConstants.accessSecret,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
     });
 
     client.user = payload;
