@@ -1,54 +1,87 @@
 import { Logger } from '@nestjs/common';
+import { Server } from 'socket.io';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
-  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { AuthService } from 'src/auth/auth.service';
-import { wsJwtAuthMiddleware } from 'src/auth/ws-jwt-auth.middleware';
 
+import { AuthService } from 'src/auth/auth.service';
+import { AuthSocket } from 'src/auth/auth-socket';
 @WebSocketGateway()
 export class NotificationsGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(private readonly authService: AuthService) {}
-
-  private userSocketMap = new Map<string, string>();
 
   @WebSocketServer()
   server: Server;
 
-  afterInit(server: Server) {
-    server.use(wsJwtAuthMiddleware(this.authService));
+  private logger = new Logger(NotificationsGateway.name);
+  private userSocketMap = new Map<string, string>();
 
-    Logger.log('WebSocket server initialized', NotificationsGateway.name);
-  }
-  handleConnection(client: Socket & { user: any }) {
-    const userId = client.user.sub;
+  private validateClient(client: AuthSocket) {
+    const authHeader = client.handshake.headers['authorization'];
+    const token = authHeader?.split(' ')[1];
 
-    this.userSocketMap.set(userId, client.id);
+    if (!token) {
+      return false;
+    }
 
-    Logger.log(
-      `Client with id ${client.id} connected`,
-      NotificationsGateway.name,
-    );
-  }
+    try {
+      const user = this.authService.validateToken(token);
 
-  handleDisconnect(client: Socket & { user: any }) {
-    const userId = client.user.sub;
+      client.user = user;
 
-    this.userSocketMap.delete(userId);
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to validate token', (error as Error).stack);
 
-    Logger.log(
-      `Client with id ${client.id} disconnected`,
-      NotificationsGateway.name,
-    );
+      return false;
+    }
   }
 
-  // TODO: ensure that user is connected before emitting
+  async handleConnection(client: AuthSocket) {
+    this.logger.log(`Client with id ${client.id} is connecting...`);
+
+    try {
+      const isAuthenticated = this.validateClient(client);
+
+      if (!isAuthenticated) {
+        this.logger.warn(
+          `Client with id ${client.id} is unauthenticated. Disconnecting...`,
+        );
+
+        client.disconnect();
+
+        return;
+      }
+
+      const user = client.user;
+
+      this.userSocketMap.set(user.id, client.id);
+      this.logger.log(`User with id ${user.id} connected`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to authenticate client with id ${client.id}`,
+        (error as Error).stack,
+      );
+
+      client.disconnect();
+
+      return;
+    }
+  }
+
+  handleDisconnect(client: AuthSocket) {
+    if (client.user) {
+      this.userSocketMap.delete(client.user.id);
+    }
+
+    this.logger.log(`Client with id ${client.id} disconnected`);
+  }
+
   emitToUser(userId: string, event: string, payload: any) {
     const socketId = this.userSocketMap.get(userId);
 
