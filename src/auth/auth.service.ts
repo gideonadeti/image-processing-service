@@ -1,9 +1,10 @@
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { CookieOptions, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, User } from '@prisma/client';
+import { PasswordResetToken, Prisma, User } from '@prisma/client';
 import { Socket } from 'socket.io';
 import {
   ConflictException,
@@ -16,6 +17,7 @@ import {
 import { SignUpDto } from './dto/sign-up.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthPayload } from './auth-payload.interface';
+import { EmailService } from './email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +25,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prismaService: PrismaService,
     private configService: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   private logger = new Logger(AuthService.name);
@@ -230,5 +233,150 @@ export class AuthService {
     });
 
     client.user = payload;
+  }
+
+  async forgotPassword(email: string) {
+    try {
+      const user = await this.prismaService.user.findUnique({
+        where: { email },
+      });
+
+      // Always return success for security (don't reveal if email exists)
+      if (!user) {
+        this.logger.log(
+          `Password reset requested for non-existent email: ${email}`,
+        );
+
+        return; // Don't throw - silently return to prevent email enumeration
+      }
+
+      // Generate secure token
+      const token = crypto.randomBytes(32).toString('hex');
+      const hashedToken = await bcrypt.hash(token, 10);
+
+      // Set expiry to 1 hour from now
+      const expiresAt = new Date();
+
+      expiresAt.setHours(expiresAt.getHours() + 1);
+
+      // Update or create reset token
+      const existingToken =
+        await this.prismaService.passwordResetToken.findUnique({
+          where: { userId: user.id },
+        });
+
+      if (existingToken) {
+        await this.prismaService.passwordResetToken.update({
+          where: { userId: user.id },
+          data: {
+            value: hashedToken,
+            expiresAt,
+            used: false, // Reset used flag
+          },
+        });
+      } else {
+        await this.prismaService.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            value: hashedToken,
+            expiresAt,
+          },
+        });
+      }
+
+      // Send email with reset link
+      await this.emailService.sendPasswordResetEmail(email, token);
+
+      this.logger.log(`Password reset email sent to ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to process password reset request for ${email}`,
+        (error as Error).stack,
+      );
+      // Don't throw - always return success to prevent email enumeration
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      // Find all unused, unexpired reset tokens and check them (since tokens are hashed)
+      const resetTokens = await this.prismaService.passwordResetToken.findMany({
+        where: {
+          used: false,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+      });
+
+      let validToken: PasswordResetToken | null = null;
+
+      for (const resetToken of resetTokens) {
+        const isMatch = await bcrypt.compare(token, resetToken.value);
+
+        if (isMatch) {
+          validToken = resetToken;
+
+          break;
+        }
+      }
+
+      if (!validToken) {
+        throw new UnauthorizedException('Invalid or expired reset token');
+      }
+
+      // Hash new password
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // Update user password
+      await this.prismaService.user.update({
+        where: { id: validToken.userId },
+        data: { password: hashedPassword },
+      });
+
+      // Mark token as used (one-to-one relationship) - provides audit trail and security monitoring
+      await this.prismaService.passwordResetToken.update({
+        where: { userId: validToken.userId },
+        data: { used: true },
+      });
+
+      // Invalidate all refresh tokens for this user
+      await this.prismaService.refreshToken.deleteMany({
+        where: { userId: validToken.userId },
+      });
+
+      this.logger.log(
+        `Password reset successful for user with ID ${validToken.userId}`,
+      );
+    } catch (error) {
+      this.handleError(error, 'reset password');
+    }
+  }
+
+  async deleteAccount(user: Partial<User>, res: Response) {
+    try {
+      const userId = user.id as string;
+
+      // Delete refresh tokens
+      await this.prismaService.refreshToken.deleteMany({
+        where: { userId },
+      });
+
+      // Delete password reset tokens
+      await this.prismaService.passwordResetToken.deleteMany({
+        where: { userId },
+      });
+
+      // Delete user (cascades will handle related records)
+      await this.prismaService.user.delete({
+        where: { id: userId },
+      });
+
+      // Clear cookies
+      res.clearCookie('refreshToken', this.getRefreshCookieConfig());
+      res.sendStatus(200);
+    } catch (error) {
+      this.handleError(error, 'delete account');
+    }
   }
 }
