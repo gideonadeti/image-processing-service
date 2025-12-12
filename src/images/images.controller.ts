@@ -37,6 +37,7 @@ export class ImagesController {
   private validateTransformations(dto: TransformImageDto) {
     const hasResize =
       dto.resize && (dto.resize.width != null || dto.resize.height != null);
+
     const hasCrop = dto.crop != null;
     const hasRotate = dto.rotate != null;
     const hasGrayscale = dto.grayscale != null;
@@ -111,18 +112,18 @@ export class ImagesController {
     return this.imagesService.create(userId, image);
   }
 
-  // @UseGuards(ThrottlerGuard)
-  // @Post(':id/transform')
-  // transform(
-  //   @UserId() userId: string,
-  //   @Param('id') id: string,
-  //   @Body() transformImageDto: TransformImageDto,
-  // ) {
-  //   this.validateTransformations(transformImageDto);
-  //   this.validateOrderIntegrity(transformImageDto);
+  @UseGuards(ThrottlerGuard)
+  @Post(':id/transform')
+  transform(
+    @UserId() userId: string,
+    @Param('id') id: string,
+    @Body() transformImageDto: TransformImageDto,
+  ) {
+    this.validateTransformations(transformImageDto);
+    this.validateOrderIntegrity(transformImageDto);
 
-  //   return this.imagesService.transform(userId, id, transformImageDto);
-  // }
+    return this.imagesService.transform(userId, id, transformImageDto);
+  }
 
   @Get()
   findAll(@UserId() userId: string) {

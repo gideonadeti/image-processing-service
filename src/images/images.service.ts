@@ -72,9 +72,11 @@ export class ImagesService {
         ([_, value]) => value !== undefined && value !== null,
       ),
     );
+
     const sortedOptions = Object.fromEntries(
       Object.entries(filteredOptions).sort(([a], [b]) => a.localeCompare(b)),
     );
+
     const hash = createHash('sha256')
       .update(JSON.stringify(sortedOptions))
       .digest('hex');
@@ -82,7 +84,7 @@ export class ImagesService {
     return `${userId}:transformations:${imageId}-${hash}`;
   }
 
-  private async uploadImageToCloudinary(
+  async uploadImageToCloudinary(
     image: Express.Multer.File,
     folder = 'Bildtransformator-Images',
   ) {
@@ -102,6 +104,24 @@ export class ImagesService {
         error,
         `upload image with original name '${image.originalname}' to folder '${folder}'`,
       );
+    }
+  }
+
+  async getFileBufferFromCloudinary(secureUrl: string): Promise<Buffer> {
+    try {
+      const response = await fetch(secureUrl);
+
+      if (!response.ok) {
+        throw new BadRequestException(
+          `Failed to fetch image from Cloudinary: ${response.statusText}`,
+        );
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+
+      return Buffer.from(arrayBuffer);
+    } catch (error) {
+      this.handleError(error, 'fetch image buffer from Cloudinary');
     }
   }
 
@@ -132,62 +152,56 @@ export class ImagesService {
     }
   }
 
-  // async transform(
-  //   userId: string,
-  //   id: string,
-  //   transformImageDto: TransformImageDto,
-  // ) {
-  //   try {
-  //     const image = await this.prismaService.image.findUnique({
-  //       where: {
-  //         id,
-  //       },
-  //     });
+  async transform(
+    userId: string,
+    id: string,
+    transformImageDto: TransformImageDto,
+  ) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
 
-  //     if (!image) {
-  //       throw new BadRequestException('Image not found');
-  //     }
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
 
-  //     if (image.userId !== userId) {
-  //       throw new ForbiddenException(
-  //         'You are not authorized to transform this image',
-  //       );
-  //     }
+      const transformedImageCacheKey = this.generateTransformedImageCacheKey(
+        userId,
+        id,
+        transformImageDto,
+      );
 
-  //     const transformedImageCacheKey = this.generateTransformedImageCacheKey(
-  //       userId,
-  //       id,
-  //       transformImageDto,
-  //     );
+      const transformedImage: TransformedImage = await this.cacheManager.get(
+        transformedImageCacheKey,
+      );
 
-  //     const transformedImage: TransformedImage = await this.cacheManager.get(
-  //       transformedImageCacheKey,
-  //     );
+      if (transformedImage) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { publicId: _, ...rest } = transformedImage;
 
-  //     if (transformedImage) {
-  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //       const { publicId: _, ...rest } = transformedImage;
+        return {
+          ...rest,
+        };
+      }
 
-  //       return {
-  //         ...rest,
-  //       };
-  //     }
+      const job = await this.imagesQueue.add('transform', {
+        userId,
+        image,
+        transformImageDto,
+        transformedImageCacheKey,
+      });
 
-  //     const job = await this.imagesQueue.add('transform', {
-  //       userId,
-  //       image,
-  //       transformImageDto,
-  //       transformedImageCacheKey,
-  //     });
-
-  //     return {
-  //       jobId: job.id,
-  //       status: 'queued',
-  //     };
-  //   } catch (error) {
-  //     this.handleError(error, 'transform image');
-  //   }
-  // }
+      return {
+        jobId: job.id,
+      };
+    } catch (error) {
+      this.handleError(error, 'transform image');
+    }
+  }
 
   async findAll(userId: string) {
     try {
