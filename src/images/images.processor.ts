@@ -20,6 +20,8 @@ import { ImagesService } from './images.service';
 
 @Processor('images', { concurrency: 2 })
 export class ImagesProcessor extends WorkerHost {
+  private readonly logger = new Logger(ImagesProcessor.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
@@ -162,27 +164,23 @@ export class ImagesProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job, result: any) {
-    Logger.log(`Job with ID ${job.id} completed`, ImagesProcessor.name);
+    this.logger.log(`Job with ID ${job.id} completed`);
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      `${job.id}-completed`,
+      'image-transformation-completed',
       result,
     );
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
-    Logger.error(
-      `Job with ID ${job.id} failed`,
-      error.stack,
-      ImagesProcessor.name,
-    );
+    this.logger.error(`Job with ID ${job.id} failed`, error.stack);
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      `${job.id}-failed`,
-      error.message,
+      'image-transformation-failed',
+      { message: error.message },
     );
   }
 }
