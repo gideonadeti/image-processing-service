@@ -22,8 +22,8 @@ export class NotificationsGateway
   private userSocketMap = new Map<string, string>();
 
   private validateClient(client: AuthSocket) {
-    const authHeader = client.handshake.headers['authorization'];
-    const token = authHeader?.split(' ')[1];
+    const auth = client.handshake.auth as { token?: string };
+    const token = auth.token;
 
     if (!token) {
       return false;
