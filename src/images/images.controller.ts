@@ -40,7 +40,7 @@ export class ImagesController {
 
     const hasCrop = dto.crop != null;
     const hasRotate = dto.rotate != null;
-    const hasGrayscale = dto.grayscale != null;
+    const hasGrayscale = dto.grayscale === true;
     const hasTint = dto.tint != null;
 
     if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
@@ -65,7 +65,7 @@ export class ImagesController {
       activeTransforms.push('resize');
     if (dto.crop) activeTransforms.push('crop');
     if (dto.rotate != null) activeTransforms.push('rotate');
-    if (dto.grayscale != null) activeTransforms.push('grayscale');
+    if (dto.grayscale === true) activeTransforms.push('grayscale');
     if (dto.tint != null) activeTransforms.push('tint');
 
     const invalidSteps = dto.order.filter(
