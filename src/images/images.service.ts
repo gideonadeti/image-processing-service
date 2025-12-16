@@ -15,10 +15,7 @@ import {
 import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
-import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
-import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
 import { TransformedImage } from '@prisma/client';
 
 @Injectable()
@@ -209,11 +206,23 @@ export class ImagesService {
         where: {
           userId,
         },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          transformedImages: true,
+        },
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return images.map(({ publicId, ...rest }) => ({
         ...rest,
+        transformedImages: rest.transformedImages.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ({ publicId, ...rest }) => ({
+            ...rest,
+          }),
+        ),
       }));
     } catch (error) {
       this.handleError(error, `'fetch images for user with ID ${userId}'`);
@@ -326,35 +335,130 @@ export class ImagesService {
   //   }
   // }
 
-  // async remove(userId: string, id: string) {
-  //   try {
-  //     const image = await this.prismaService.image.delete({
-  //       where: {
-  //         id,
-  //       },
-  //     });
+  private async collectAllTransformedImages(
+    transformedImageId: string,
+    collected: Set<string>,
+  ) {
+    if (collected.has(transformedImageId)) {
+      return [];
+    }
 
-  //     if (!image) {
-  //       throw new BadRequestException(`Image with ID ${id} not found`);
-  //     }
+    collected.add(transformedImageId);
 
-  //     if (image.userId !== userId) {
-  //       throw new ForbiddenException(
-  //         'You are not authorized to delete this image',
-  //       );
-  //     }
+    // Get all nested transformed images (children)
+    const nestedTransformedImages =
+      await this.prismaService.transformedImage.findMany({
+        where: {
+          parentId: transformedImageId,
+        },
+      });
 
-  //     await this.awsS3Service.deleteFile(image.key);
+    const allIds = [transformedImageId];
 
-  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //     const { key, userId: _, ...rest } = image;
+    // Recursively collect nested transformed images
+    for (const nested of nestedTransformedImages) {
+      const nestedIds = await this.collectAllTransformedImages(
+        nested.id,
+        collected,
+      );
+      allIds.push(...nestedIds);
+    }
 
-  //     return {
-  //       ...rest,
-  //       url: this.baseUrl + '/images/' + image.id + '/view',
-  //     };
-  //   } catch (error) {
-  //     this.handleError(error, `delete image with ID ${id}`);
-  //   }
-  // }
+    return allIds;
+  }
+
+  async remove(userId: string, id: string) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+          userId,
+        },
+        include: {
+          transformedImages: true,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException(`Image with ID ${id} not found`);
+      }
+
+      // Collect all transformed image IDs (including nested ones)
+      const collected = new Set<string>();
+      const allTransformedImageIds: string[] = [];
+
+      for (const transformedImage of image.transformedImages) {
+        const ids = await this.collectAllTransformedImages(
+          transformedImage.id,
+          collected,
+        );
+        allTransformedImageIds.push(...ids);
+      }
+
+      // Fetch all transformed images to get their publicIds
+      const allTransformedImages =
+        allTransformedImageIds.length > 0
+          ? await this.prismaService.transformedImage.findMany({
+              where: {
+                id: {
+                  in: allTransformedImageIds,
+                },
+              },
+              select: {
+                publicId: true,
+              },
+            })
+          : [];
+
+      // Delete all transformed images from Cloudinary in parallel
+      const deletePromises = allTransformedImages.map((transformedImage) =>
+        cloudinary.uploader
+          .destroy(transformedImage.publicId)
+          .catch((error) => {
+            console.error(
+              `Failed to delete transformed image with publicId ${transformedImage.publicId} from Cloudinary:`,
+              error,
+            );
+            // Continue even if Cloudinary deletion fails
+          }),
+      );
+
+      // Also delete the original image from Cloudinary
+      deletePromises.push(
+        cloudinary.uploader.destroy(image.publicId).catch((error) => {
+          console.error(
+            `Failed to delete image ${image.id} from Cloudinary:`,
+            error,
+          );
+          // Continue with database deletion even if Cloudinary deletion fails
+        }),
+      );
+
+      // Wait for all Cloudinary deletions to complete (in parallel)
+      await Promise.all(deletePromises);
+
+      // Delete from database (cascade will handle all transformed images)
+      await this.prismaService.image.delete({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { publicId, userId: _, transformedImages, ...rest } = image;
+
+      return {
+        ...rest,
+        transformedImages: transformedImages.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ({ publicId, ...rest }) => ({
+            ...rest,
+          }),
+        ),
+      };
+    } catch (error) {
+      this.handleError(error, `delete image with ID ${id}`);
+    }
+  }
 }

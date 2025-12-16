@@ -150,8 +150,8 @@ export class ImagesController {
   //   return this.imagesService.findAllTransformed(userId, id);
   // }
 
-  // @Delete(':id')
-  // remove(@UserId() userId: string, @Param('id') id: string) {
-  //   return this.imagesService.remove(userId, id);
-  // }
+  @Delete(':id')
+  remove(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.remove(userId, id);
+  }
 }
