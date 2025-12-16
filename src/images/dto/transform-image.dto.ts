@@ -7,7 +7,7 @@ import {
   IsPositive,
   IsIn,
   IsDefined,
-  IsNumber,
+  IsInt,
   Min,
   Max,
   IsArray,
@@ -21,6 +21,7 @@ export class ResizeOptions {
    * @example 800
    */
   @IsOptional()
+  @IsInt()
   @IsPositive()
   width?: number;
 
@@ -29,6 +30,7 @@ export class ResizeOptions {
    * @example 600
    */
   @IsOptional()
+  @IsInt()
   @IsPositive()
   height?: number;
 
@@ -47,7 +49,7 @@ export class CropOptions {
    * @example 100
    */
   @IsDefined()
-  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsInt()
   @Min(0)
   left: number;
 
@@ -56,7 +58,7 @@ export class CropOptions {
    * @example 50
    */
   @IsDefined()
-  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsInt()
   @Min(0)
   top: number;
 
@@ -65,6 +67,7 @@ export class CropOptions {
    * @example 300
    */
   @IsDefined()
+  @IsInt()
   @IsPositive()
   width: number;
 
@@ -73,6 +76,7 @@ export class CropOptions {
    * @example 200
    */
   @IsDefined()
+  @IsInt()
   @IsPositive()
   height: number;
 }
@@ -101,7 +105,7 @@ export class TransformImageDto {
    * @example 90
    */
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(-360)
   @Max(360)
   rotate?: number;
