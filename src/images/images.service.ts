@@ -395,7 +395,7 @@ export class ImagesService {
         allTransformedImageIds.push(...ids);
       }
 
-      // Fetch all transformed images to get their publicIds
+      // Fetch all transformed images to get their publicIds, transformations, and parentIds
       const allTransformedImages =
         allTransformedImageIds.length > 0
           ? await this.prismaService.transformedImage.findMany({
@@ -405,10 +405,45 @@ export class ImagesService {
                 },
               },
               select: {
+                id: true,
                 publicId: true,
+                transformation: true,
+                parentId: true,
               },
             })
           : [];
+
+      // Delete cache entries for all transformed images
+      const cacheDeletePromises = allTransformedImages.map(
+        async (transformedImage) => {
+          try {
+            // Reconstruct the cache key using the stored transformation
+            const transformImageDto =
+              transformedImage.transformation as unknown as TransformImageDto;
+
+            // For nested transformations (with parentId), use parentId for cache key
+            // For direct transformations (no parentId), use original image ID
+            const imageIdForCache = transformedImage.parentId || id;
+            const cacheKey = this.generateTransformedImageCacheKey(
+              userId,
+              imageIdForCache,
+              transformImageDto,
+            );
+
+            // Check if cache entry exists and delete it
+            const cachedValue = await this.cacheManager.get(cacheKey);
+            if (cachedValue) {
+              await this.cacheManager.del(cacheKey);
+            }
+          } catch (error) {
+            console.error(
+              `Failed to delete cache entry for transformed image:`,
+              error,
+            );
+            // Continue even if cache deletion fails
+          }
+        },
+      );
 
       // Delete all transformed images from Cloudinary in parallel
       const deletePromises = allTransformedImages.map((transformedImage) =>
@@ -434,8 +469,8 @@ export class ImagesService {
         }),
       );
 
-      // Wait for all Cloudinary deletions to complete (in parallel)
-      await Promise.all(deletePromises);
+      // Wait for all cache deletions and Cloudinary deletions to complete (in parallel)
+      await Promise.all([...cacheDeletePromises, ...deletePromises]);
 
       // Delete from database (cascade will handle all transformed images)
       await this.prismaService.image.delete({
