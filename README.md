@@ -2,6 +2,15 @@
 
 A backend system similar to Cloudinary that allows users to upload images, apply transformations, and view or download the results.
 
+## File Storage Note
+
+File storage was originally handled using AWS S3.  
+The service was later shut down after the AWS free-tier period ended.  
+
+The application code, architecture, and core logic remain intact and can be redeployed if needed.
+
+I’m currently migrating storage to Cloudinary and building a frontend interface for the service.
+
 ## Features
 
 - User authentication (sign-up, sign-in, sign-out)
