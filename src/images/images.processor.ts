@@ -1,7 +1,6 @@
 import * as sharp from 'sharp';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import {
@@ -24,15 +23,12 @@ export class ImagesProcessor extends WorkerHost {
 
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly configService: ConfigService,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly imagesService: ImagesService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     super();
   }
-
-  private readonly baseUrl = this.configService.get<string>('BASE_URL');
 
   private handleError(error: any, action: string) {
     console.error(`Failed to ${action}:`, error);

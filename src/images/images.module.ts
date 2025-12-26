@@ -23,5 +23,6 @@ import { ImagesEventsListener } from './images.events.listener';
     NotificationsGateway,
     ImagesEventsListener,
   ],
+  exports: [ImagesService],
 })
 export class ImagesModule {}

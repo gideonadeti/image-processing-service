@@ -10,11 +10,13 @@ import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { AuthModule } from 'src/auth/auth.module';
 import { JwtService } from '@nestjs/jwt';
 import { TransformedImagesEventsListener } from './transformed-images.events.listener';
+import { ImagesModule } from 'src/images/images.module';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: 'transformed-images' }),
     AuthModule,
+    ImagesModule,
   ],
   controllers: [TransformedImagesController],
   providers: [
