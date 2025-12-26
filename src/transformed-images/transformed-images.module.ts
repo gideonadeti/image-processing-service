@@ -3,7 +3,6 @@ import { BullModule } from '@nestjs/bullmq';
 
 import { TransformedImagesService } from './transformed-images.service';
 import { TransformedImagesController } from './transformed-images.controller';
-import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransformedImagesProcessor } from './transformed-images.processor';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
@@ -21,7 +20,6 @@ import { ImagesModule } from 'src/images/images.module';
   controllers: [TransformedImagesController],
   providers: [
     TransformedImagesService,
-    AwsS3Service,
     PrismaService,
     TransformedImagesProcessor,
     NotificationsGateway,
