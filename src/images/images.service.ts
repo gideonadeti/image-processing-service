@@ -217,12 +217,14 @@ export class ImagesService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return images.map(({ publicId, ...rest }) => ({
         ...rest,
-        transformedImages: rest.transformedImages.map(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          ({ publicId, ...rest }) => ({
-            ...rest,
-          }),
-        ),
+        transformedImages: rest.transformedImages
+          .filter((ti) => ti.parentId === null) // Filter out nested transformed images
+          .map(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            ({ publicId, ...rest }) => ({
+              ...rest,
+            }),
+          ),
       }));
     } catch (error) {
       this.handleError(error, `'fetch images for user with ID ${userId}'`);
