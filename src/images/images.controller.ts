@@ -1,7 +1,6 @@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import {
   Controller,
@@ -14,18 +13,13 @@ import {
   UseInterceptors,
   UploadedFile,
   ParseFilePipeBuilder,
-  Res,
-  Query,
   BadRequestException,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
-import { FindAllImagesDto } from './dto/find-all-images.dto';
 import { TransformImageDto } from './dto/transform-image.dto';
-import { ViewOrDownloadImageDto } from './dto/view-or-download-image.dto';
-import { Public } from 'src/public/public.decorator';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -129,26 +123,6 @@ export class ImagesController {
   findAll(@UserId() userId: string) {
     return this.imagesService.findAll(userId);
   }
-
-  // @Get(':id')
-  // findOne(@UserId() userId: string, @Param('id') id: string) {
-  //   return this.imagesService.findOne(userId, id);
-  // }
-
-  // @Public()
-  // @Get(':id/view')
-  // viewOrDownload(
-  //   @Param('id') id: string,
-  //   @Query() query: ViewOrDownloadImageDto,
-  //   @Res() res: Response,
-  // ) {
-  //   return this.imagesService.viewOrDownload(id, query, res);
-  // }
-
-  // @Get(':id/transformed')
-  // findAllTransformed(@UserId() userId: string, @Param('id') id: string) {
-  //   return this.imagesService.findAllTransformed(userId, id);
-  // }
 
   @Delete(':id')
   remove(@UserId() userId: string, @Param('id') id: string) {
