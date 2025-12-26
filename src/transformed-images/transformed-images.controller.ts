@@ -1,12 +1,11 @@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import {
   Controller,
   Get,
   Param,
   Delete,
   UseGuards,
-  Query,
-  Res,
   Post,
   Body,
   BadRequestException,
@@ -14,12 +13,8 @@ import {
 
 import { TransformedImagesService } from './transformed-images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { Response } from 'express';
-import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
-import { Public } from 'src/public/public.decorator';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 @ApiTags('TransformedImages')
 @ApiBearerAuth()
@@ -35,7 +30,7 @@ export class TransformedImagesController {
       dto.resize && (dto.resize.width != null || dto.resize.height != null);
     const hasCrop = dto.crop != null;
     const hasRotate = dto.rotate != null;
-    const hasGrayscale = dto.grayscale != null;
+    const hasGrayscale = dto.grayscale === true;
     const hasTint = dto.tint != null;
 
     if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
@@ -60,7 +55,7 @@ export class TransformedImagesController {
       activeTransforms.push('resize');
     if (dto.crop) activeTransforms.push('crop');
     if (dto.rotate != null) activeTransforms.push('rotate');
-    if (dto.grayscale != null) activeTransforms.push('grayscale');
+    if (dto.grayscale === true) activeTransforms.push('grayscale');
     if (dto.tint != null) activeTransforms.push('tint');
 
     const invalidSteps = dto.order.filter(
@@ -101,28 +96,13 @@ export class TransformedImagesController {
     );
   }
 
-  @Get()
-  findAll(@UserId() userId: string) {
-    return this.transformedImagesService.findAll(userId);
-  }
-
   @Get(':id')
   findOne(@UserId() userId: string, @Param('id') id: string) {
     return this.transformedImagesService.findOne(userId, id);
   }
 
-  @Public()
-  @Get(':id/view')
-  viewOrDownload(
-    @Param('id') id: string,
-    @Query() query: ViewOrDownloadImageDto,
-    @Res() res: Response,
-  ) {
-    return this.transformedImagesService.viewOrDownload(id, query, res);
-  }
-
-  @Delete(':id')
-  remove(@UserId() userId: string, @Param('id') id: string) {
-    return this.transformedImagesService.remove(userId, id);
-  }
+  // @Delete(':id')
+  // remove(@UserId() userId: string, @Param('id') id: string) {
+  //   return this.transformedImagesService.remove(userId, id);
+  // }
 }

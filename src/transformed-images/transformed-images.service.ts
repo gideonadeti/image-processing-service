@@ -1,5 +1,3 @@
-import { Response } from 'express';
-import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -14,22 +12,16 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 
-import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { ViewOrDownloadImageDto } from 'src/images/dto/view-or-download-image.dto';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
 
 @Injectable()
 export class TransformedImagesService {
   constructor(
-    private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
-    private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue('transformed-images') private transformedImagesQueue: Queue,
   ) {}
-
-  private readonly baseUrl = this.configService.get<string>('BASE_URL');
 
   private handleError(error: any, action: string) {
     console.error(`Failed to ${action}:`, error);
@@ -96,20 +88,16 @@ export class TransformedImagesService {
           id,
           transformImageDto,
         );
+
       const transformedTransformedImage: TransformedImage =
         await this.cacheManager.get(transformedTransformedImageCacheKey);
 
       if (transformedTransformedImage) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { key: _, ...rest } = transformedTransformedImage;
+        const { publicId, ...rest } = transformedTransformedImage;
 
         return {
           ...rest,
-          url:
-            this.baseUrl +
-            '/transformed-images/' +
-            transformedTransformedImage.id +
-            '/view',
         };
       }
 
@@ -122,31 +110,9 @@ export class TransformedImagesService {
 
       return {
         jobId: job.id,
-        status: 'queued',
       };
     } catch (error) {
       this.handleError(error, 'transform transformed image');
-    }
-  }
-
-  async findAll(userId: string) {
-    try {
-      const transformedImages =
-        await this.prismaService.transformedImage.findMany({
-          where: {
-            originalImage: {
-              userId,
-            },
-          },
-        });
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      return transformedImages.map(({ key, ...rest }) => ({
-        ...rest,
-        url: this.baseUrl + '/transformed-images/' + rest.id + '/view',
-      }));
-    } catch (error) {
-      this.handleError(error, 'find all transformed images');
     }
   }
 
@@ -158,107 +124,80 @@ export class TransformedImagesService {
             id,
           },
           include: {
-            originalImage: true,
+            originalImage: {
+              select: {
+                userId: true,
+              },
+            },
+            transformedTransformedImages: true,
           },
         });
 
       if (!transformedImage) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
+        throw new BadRequestException(
+          `Transformed image with ID ${id} not found`,
+        );
       }
 
       if (transformedImage.originalImage.userId !== userId) {
         throw new ForbiddenException(
-          `You do not have permission to access this transformed image`,
+          'You are not authorized to access this transformed image',
         );
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, originalImage, ...rest } = transformedImage;
+      const { publicId, originalImage, ...rest } = transformedImage;
 
       return {
         ...rest,
-        url:
-          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+        transformedTransformedImages:
+          transformedImage.transformedTransformedImages.map(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            ({ publicId, ...rest }) => ({
+              ...rest,
+            }),
+          ),
       };
     } catch (error) {
       this.handleError(error, `fetch transformed image with ID ${id}`);
     }
   }
 
-  async viewOrDownload(
-    id: string,
-    query: ViewOrDownloadImageDto,
-    res: Response,
-  ) {
-    const { download } = query;
-    const transformedImage =
-      await this.prismaService.transformedImage.findUnique({
-        where: {
-          id,
-        },
-        include: {
-          originalImage: true,
-        },
-      });
+  // async remove(userId: string, id: string) {
+  //   try {
+  //     const transformedImage = await this.prismaService.transformedImage.delete(
+  //       {
+  //         where: {
+  //           id,
+  //         },
+  //         include: {
+  //           originalImage: true,
+  //         },
+  //       },
+  //     );
 
-    if (!transformedImage) {
-      throw new BadRequestException(
-        `Transformed image with ID ${id} not found`,
-      );
-    }
+  //     if (!transformedImage) {
+  //       throw new BadRequestException(`Image with ID ${id} not found`);
+  //     }
 
-    const stream = await this.awsS3Service.getFileStream(transformedImage.key);
-    const format = transformedImage.originalImage.format;
+  //     if (transformedImage.originalImage.userId !== userId) {
+  //       throw new ForbiddenException(
+  //         `You do not have permission to delete this transformed image`,
+  //       );
+  //     }
 
-    res.setHeader('Content-Type', 'image/' + format);
+  //     await this.awsS3Service.deleteFile(transformedImage.key);
 
-    if (download) {
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${transformedImage.originalImage.originalName}"`,
-      );
-    } else {
-      res.setHeader('Content-Disposition', 'inline');
-    }
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //     const { key, originalImage, ...rest } = transformedImage;
 
-    stream.pipe(res);
-  }
-
-  async remove(userId: string, id: string) {
-    try {
-      const transformedImage = await this.prismaService.transformedImage.delete(
-        {
-          where: {
-            id,
-          },
-          include: {
-            originalImage: true,
-          },
-        },
-      );
-
-      if (!transformedImage) {
-        throw new BadRequestException(`Image with ID ${id} not found`);
-      }
-
-      if (transformedImage.originalImage.userId !== userId) {
-        throw new ForbiddenException(
-          `You do not have permission to delete this transformed image`,
-        );
-      }
-
-      await this.awsS3Service.deleteFile(transformedImage.key);
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key, originalImage, ...rest } = transformedImage;
-
-      return {
-        ...rest,
-        url:
-          this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
-      };
-    } catch (error) {
-      this.handleError(error, `delete transformed image with ID ${id}`);
-    }
-  }
+  //     return {
+  //       ...rest,
+  //       url:
+  //         this.baseUrl + '/transformed-images/' + transformedImage.id + '/view',
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error, `delete transformed image with ID ${id}`);
+  //   }
+  // }
 }
