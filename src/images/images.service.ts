@@ -12,7 +12,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 
-import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { TransformImageDto } from './dto/transform-image.dto';
@@ -21,7 +20,6 @@ import { TransformedImage } from '@prisma/client';
 @Injectable()
 export class ImagesService {
   constructor(
-    private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -317,17 +315,15 @@ export class ImagesService {
             const transformImageDto =
               transformedImage.transformation as unknown as TransformImageDto;
 
-            // For nested transformations (with parentId), use parentId for cache key
-            // For direct transformations (no parentId), use original image ID
-            const imageIdForCache = transformedImage.parentId || id;
             const cacheKey = this.generateTransformedImageCacheKey(
               userId,
-              imageIdForCache,
+              transformedImage.id,
               transformImageDto,
             );
 
             // Check if cache entry exists and delete it
             const cachedValue = await this.cacheManager.get(cacheKey);
+
             if (cachedValue) {
               await this.cacheManager.del(cacheKey);
             }

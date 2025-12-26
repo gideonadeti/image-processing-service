@@ -9,7 +9,6 @@ import { LoggingMiddleware } from './logging/logging.middleware';
 import { PrismaService } from './prisma/prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { ImagesModule } from './images/images.module';
-import { AwsS3Service } from './aws-s3/aws-s3.service';
 import { TransformedImagesModule } from './transformed-images/transformed-images.module';
 import { JobsModule } from './jobs/jobs.module';
 
@@ -65,7 +64,7 @@ import { JobsModule } from './jobs/jobs.module';
     JobsModule,
   ],
   controllers: [],
-  providers: [PrismaService, AwsS3Service],
+  providers: [PrismaService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
