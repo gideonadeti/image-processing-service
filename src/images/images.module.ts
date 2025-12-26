@@ -11,7 +11,15 @@ import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { ImagesEventsListener } from './images.events.listener';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'images' }), AuthModule],
+  imports: [
+    BullModule.registerQueue({
+      name: 'images',
+      defaultJobOptions: {
+        removeOnComplete: true,
+      },
+    }),
+    AuthModule,
+  ],
   controllers: [ImagesController],
   providers: [
     ImagesService,
