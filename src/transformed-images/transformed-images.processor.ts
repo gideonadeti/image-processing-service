@@ -1,7 +1,6 @@
 import * as sharp from 'sharp';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { InputJsonObject } from '@prisma/client/runtime/library';
@@ -13,24 +12,23 @@ import {
   Logger,
 } from '@nestjs/common';
 
-import { AwsS3Service } from 'src/aws-s3/aws-s3.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransformImageDto } from 'src/images/dto/transform-image.dto';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { ImagesService } from 'src/images/images.service';
 
 @Processor('transformed-images', { concurrency: 2 })
 export class TransformedImagesProcessor extends WorkerHost {
+  private readonly logger = new Logger(TransformedImagesProcessor.name);
+
   constructor(
-    private readonly awsS3Service: AwsS3Service,
     private readonly prismaService: PrismaService,
-    private readonly configService: ConfigService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly imagesService: ImagesService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     super();
   }
-
-  private readonly baseUrl = this.configService.get<string>('BASE_URL');
 
   private handleError(error: any, action: string) {
     console.error(`Failed to ${action}:`, error);
@@ -112,7 +110,6 @@ export class TransformedImagesProcessor extends WorkerHost {
   async process(job: Job) {
     const {
       data: {
-        userId,
         transformedImage,
         transformImageDto,
         transformedTransformedImageCacheKey,
@@ -120,49 +117,47 @@ export class TransformedImagesProcessor extends WorkerHost {
     } = job;
 
     try {
-      const transformedImageBuffer = await this.awsS3Service.getFileBuffer(
-        transformedImage.key,
-      );
+      const transformedImageBuffer =
+        await this.imagesService.getFileBufferFromCloudinary(
+          transformedImage.secureUrl,
+        );
+
       const transformedTransformedImageBuffer = await this.transformImage(
         transformedImageBuffer,
         transformImageDto,
       );
+
+      const transformedTransformedImageSize =
+        transformedTransformedImageBuffer.length;
+
       const expressMulterFile = {
         buffer: transformedTransformedImageBuffer,
         originalname: transformedImage.originalImage.originalName,
         mimetype: `image/${transformedImage.originalImage.format}`,
+        size: transformedTransformedImageSize,
       } as Express.Multer.File;
-      const key = await this.awsS3Service.uploadFile(
-        expressMulterFile,
-        `${userId}/transformations`,
-      );
+
+      const { publicId, secureUrl } =
+        await this.imagesService.uploadImageToCloudinary(expressMulterFile);
+
       const transformedTransformedImage =
         await this.prismaService.transformedImage.create({
           data: {
             originalImageId: transformedImage.originalImage.id,
-            key,
+            publicId,
+            secureUrl,
+            size: transformedTransformedImageSize,
             transformation: transformImageDto as unknown as InputJsonObject,
             parentId: transformedImage.id,
           },
         });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { key: _, ...rest } = transformedTransformedImage;
-      const response = {
-        ...rest,
-        url:
-          this.baseUrl +
-          '/transformed-images/' +
-          transformedTransformedImage.id +
-          '/view',
-      };
+      const { publicId: _, ...rest } = transformedTransformedImage;
 
-      await this.cacheManager.set(
-        transformedTransformedImageCacheKey,
-        response,
-      );
+      await this.cacheManager.set(transformedTransformedImageCacheKey, rest);
 
-      return response;
+      return rest;
     } catch (error) {
       this.handleError(error, 'process job');
     }
@@ -170,30 +165,23 @@ export class TransformedImagesProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job, result: any) {
-    Logger.log(
-      `Job with ID ${job.id} completed`,
-      TransformedImagesProcessor.name,
-    );
+    this.logger.log(`Job with ID ${job.id} completed`);
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      `${job.id}-completed`,
+      'transformed-image-transformation-completed',
       result,
     );
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
-    Logger.error(
-      `Job with ID ${job.id} failed`,
-      error.stack,
-      TransformedImagesProcessor.name,
-    );
+    this.logger.error(`Job with ID ${job.id} failed`, error.stack);
 
     this.notificationsGateway.emitToUser(
       job.data.userId,
-      `${job.id}-failed`,
-      error.message,
+      'transformed-image-transformation-failed',
+      { message: error.message },
     );
   }
 }
