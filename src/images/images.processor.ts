@@ -3,6 +3,7 @@ import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { InputJsonObject } from '@prisma/client/runtime/library';
 import {
   BadRequestException,
   ForbiddenException,
@@ -13,7 +14,6 @@ import {
 
 import { TransformImageDto } from './dto/transform-image.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { InputJsonObject } from '@prisma/client/runtime/library';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { ImagesService } from './images.service';
 
@@ -48,7 +48,7 @@ export class ImagesProcessor extends WorkerHost {
     transformImageDto: TransformImageDto,
   ) => {
     let transformedImage = sharp(imageBuffer);
-    const { order, resize, crop, rotate, tint } = transformImageDto;
+    const { order, resize, rotate, tint } = transformImageDto;
 
     for (const step of order) {
       switch (step) {
@@ -57,25 +57,6 @@ export class ImagesProcessor extends WorkerHost {
             width: resize.width,
             height: resize.height,
             fit: resize.fit || 'cover',
-          });
-
-          break;
-        }
-
-        case 'crop': {
-          const metadata = await transformedImage.metadata();
-          const { width: imgWidth, height: imgHeight } = metadata;
-          const { width, height, left, top } = crop;
-
-          if (left + width > imgWidth || top + height > imgHeight) {
-            throw new BadRequestException('Crop area is out of bounds');
-          }
-
-          transformedImage = transformedImage.extract({
-            left,
-            top,
-            width,
-            height,
           });
 
           break;

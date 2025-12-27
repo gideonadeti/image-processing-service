@@ -28,12 +28,11 @@ export class TransformedImagesController {
   private validateTransformations(dto: TransformImageDto) {
     const hasResize =
       dto.resize && (dto.resize.width != null || dto.resize.height != null);
-    const hasCrop = dto.crop != null;
     const hasRotate = dto.rotate != null;
     const hasGrayscale = dto.grayscale === true;
     const hasTint = dto.tint != null;
 
-    if (!hasResize && !hasCrop && !hasRotate && !hasGrayscale && !hasTint) {
+    if (!hasResize && !hasRotate && !hasGrayscale && !hasTint) {
       throw new BadRequestException(
         'At least one valid transformation option must be provided.',
       );
@@ -47,13 +46,11 @@ export class TransformedImagesController {
   }
 
   private validateOrderIntegrity(dto: TransformImageDto) {
-    const activeTransforms: Array<
-      'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'
-    > = [];
+    const activeTransforms: Array<'resize' | 'rotate' | 'grayscale' | 'tint'> =
+      [];
 
     if (dto.resize && (dto.resize.width || dto.resize.height))
       activeTransforms.push('resize');
-    if (dto.crop) activeTransforms.push('crop');
     if (dto.rotate != null) activeTransforms.push('rotate');
     if (dto.grayscale === true) activeTransforms.push('grayscale');
     if (dto.tint != null) activeTransforms.push('tint');

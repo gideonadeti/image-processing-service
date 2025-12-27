@@ -8,7 +8,6 @@ A backend system similar to Cloudinary that allows users to upload images, apply
 - Image upload
 - Image transformations of original images and transformed images with the following options:
   - Resize
-  - Crop
   - Rotate
   - Grayscale
   - Tint

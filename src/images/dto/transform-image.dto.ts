@@ -43,44 +43,6 @@ export class ResizeOptions {
   fit?: 'contain' | 'cover' | 'fill' | 'inside' | 'outside';
 }
 
-export class CropOptions {
-  /**
-   * Crop left position
-   * @example 100
-   */
-  @IsDefined()
-  @IsInt()
-  @Min(0)
-  left: number;
-
-  /**
-   * Crop top position
-   * @example 50
-   */
-  @IsDefined()
-  @IsInt()
-  @Min(0)
-  top: number;
-
-  /**
-   * Crop width
-   * @example 300
-   */
-  @IsDefined()
-  @IsInt()
-  @IsPositive()
-  width: number;
-
-  /**
-   * Crop height
-   * @example 200
-   */
-  @IsDefined()
-  @IsInt()
-  @IsPositive()
-  height: number;
-}
-
 export class TransformImageDto {
   /**
    * Resize options for the image
@@ -90,15 +52,6 @@ export class TransformImageDto {
   @IsObject()
   @ValidateNested()
   resize?: ResizeOptions;
-
-  /**
-   * Crop options for the image
-   */
-  @Type(() => CropOptions)
-  @IsOptional()
-  @IsObject()
-  @ValidateNested()
-  crop?: CropOptions;
 
   /**
    * Rotate image in degrees
@@ -138,12 +91,12 @@ export class TransformImageDto {
 
   /**
    * Order of transformations to apply.
-   * @example ['resize', 'crop', 'rotate']
+   * @example ['resize', 'rotate']
    */
   @IsDefined()
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique()
-  @IsIn(['resize', 'crop', 'rotate', 'grayscale', 'tint'], { each: true })
-  order: Array<'resize' | 'crop' | 'rotate' | 'grayscale' | 'tint'>;
+  @IsIn(['resize', 'rotate', 'grayscale', 'tint'], { each: true })
+  order: Array<'resize' | 'rotate' | 'grayscale' | 'tint'>;
 }
