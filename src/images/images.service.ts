@@ -215,13 +215,10 @@ export class ImagesService {
       }
 
       // Check if like already exists
-      const existingLike = await this.prismaService.like.findUnique({
+      const existingLike = await this.prismaService.like.findFirst({
         where: {
-          userId_imageId_transformedImageId: {
-            userId,
-            imageId: id,
-            transformedImageId: null,
-          },
+          userId,
+          imageId: id,
         },
       });
 
