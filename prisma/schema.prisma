@@ -19,7 +19,6 @@ model User {
   passwordResetToken PasswordResetToken?
   images             Image[]
   likes              Like[]
-  downloads          Download[]
 }
 
 model RefreshToken {
@@ -46,20 +45,20 @@ model PasswordResetToken {
 }
 
 model Image {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
-  originalName String
-  size         Int
-  format       String
-  publicId     String
-  secureUrl    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @db.ObjectId
+  originalName   String
+  size           Int
+  format         String
+  publicId       String
+  secureUrl      String
+  downloadsCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   transformedImages TransformedImage[]
   likes             Like[]
-  downloads         Download[]
 }
 
 model TransformedImage {
@@ -69,6 +68,7 @@ model TransformedImage {
   secureUrl       String
   size            Int
   transformation  Json
+  downloadsCount  Int      @default(0)
   parentId        String?  @db.ObjectId
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -77,7 +77,6 @@ model TransformedImage {
   originalImage                Image              @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
   transformedTransformedImages TransformedImage[] @relation("TransformedImageTree")
   likes                        Like[]
-  downloads                    Download[]
 }
 
 model Like {
@@ -93,17 +92,4 @@ model Like {
   transformedImage TransformedImage? @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
 
   @@unique([userId, imageId, transformedImageId])
-}
-
-model Download {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId             String   @db.ObjectId
-  imageId            String?  @db.ObjectId
-  transformedImageId String?  @db.ObjectId
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  image            Image?            @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  transformedImage TransformedImage? @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
 }
