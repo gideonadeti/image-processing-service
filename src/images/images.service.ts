@@ -251,7 +251,7 @@ export class ImagesService {
         action: 'liked',
       };
     } catch (error) {
-      this.handleError(error, 'like image');
+      this.handleError(error, 'like or unlike image');
     }
   }
 
