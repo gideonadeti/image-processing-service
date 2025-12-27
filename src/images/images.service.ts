@@ -268,13 +268,15 @@ export class ImagesService {
         throw new BadRequestException('Image not found');
       }
 
+      // For MongoDB, we need to increment the count manually
+      // Prisma's increment might not work reliably with MongoDB
       await this.prismaService.image.update({
         where: {
           id,
           userId,
         },
         data: {
-          downloadsCount: { increment: 1 },
+          downloadsCount: (image.downloadsCount ?? 0) + 1,
         },
       });
 
