@@ -101,8 +101,8 @@ export class TransformedImagesController {
     return this.transformedImagesService.findOne(userId, id);
   }
 
-  // @Delete(':id')
-  // remove(@UserId() userId: string, @Param('id') id: string) {
-  //   return this.transformedImagesService.remove(userId, id);
-  // }
+  @Delete(':id')
+  remove(@UserId() userId: string, @Param('id') id: string) {
+    return this.transformedImagesService.remove(userId, id);
+  }
 }
