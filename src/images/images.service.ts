@@ -342,6 +342,43 @@ export class ImagesService {
     }
   }
 
+  async findAllPublic() {
+    try {
+      const images = await this.prismaService.image.findMany({
+        where: {
+          isPublic: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          transformedImages: {
+            where: {
+              isPublic: true,
+            },
+          },
+          likes: true,
+        },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return images.map(({ publicId, ...rest }) => ({
+        ...rest,
+        transformedImages:
+          rest.transformedImages
+            .filter((ti) => ti.parentId === null) // Filter out nested transformed images
+            .map(
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              ({ publicId, ...rest }) => ({
+                ...rest,
+              }),
+            ) || [],
+      }));
+    } catch (error) {
+      this.handleError(error, 'fetch public images');
+    }
+  }
+
   private async collectAllTransformedImages(
     transformedImageId: string,
     collected: Set<string>,
