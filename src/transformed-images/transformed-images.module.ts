@@ -13,7 +13,12 @@ import { ImagesModule } from 'src/images/images.module';
 
 @Module({
   imports: [
-    BullModule.registerQueue({ name: 'transformed-images' }),
+    BullModule.registerQueue({
+      name: 'transformed-images',
+      defaultJobOptions: {
+        removeOnComplete: true,
+      },
+    }),
     AuthModule,
     ImagesModule,
   ],
