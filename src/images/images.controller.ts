@@ -123,9 +123,10 @@ export class ImagesController {
     return this.imagesService.likeUnlike(userId, id);
   }
 
+  @Public()
   @Post(':id/download')
-  download(@UserId() userId: string, @Param('id') id: string) {
-    return this.imagesService.download(userId, id);
+  download(@Param('id') id: string) {
+    return this.imagesService.download(id);
   }
 
   @Patch(':id/toggle-public')

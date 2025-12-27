@@ -246,12 +246,12 @@ export class ImagesService {
     }
   }
 
-  async download(userId: string, id: string) {
+  async download(id: string) {
     try {
       const image = await this.prismaService.image.findUnique({
         where: {
           id,
-          userId,
+          isPublic: true,
         },
       });
 
@@ -264,7 +264,6 @@ export class ImagesService {
       await this.prismaService.image.update({
         where: {
           id,
-          userId,
         },
         data: {
           downloadsCount: (image.downloadsCount ?? 0) + 1,
