@@ -296,6 +296,7 @@ export class ImagesService {
         },
         include: {
           transformedImages: true,
+          likes: true,
         },
       });
 
