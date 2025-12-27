@@ -40,6 +40,7 @@ export class TransformedImagesService {
     userId: string,
     transformedImageId: string,
     transformImageDto: TransformImageDto,
+    isNested: boolean = true,
   ): string {
     const filteredOptions = Object.fromEntries(
       Object.entries(transformImageDto).filter(
@@ -54,7 +55,9 @@ export class TransformedImagesService {
       .update(JSON.stringify(sortedOptions))
       .digest('hex');
 
-    return `bildtransformator:users:${userId}:transformed-transformations:${transformedImageId}-${hash}`;
+    const prefix = isNested ? 'transformed-transformations' : 'transformations';
+
+    return `bildtransformator:users:${userId}:${prefix}:${transformedImageId}-${hash}`;
   }
 
   async transform(
@@ -165,29 +168,29 @@ export class TransformedImagesService {
   }
 
   private async collectAllNestedTransformedImages(
-    transformedImageId: string,
+    transformedTransformedImageId: string,
     collected: Set<string>,
   ) {
-    if (collected.has(transformedImageId)) {
+    if (collected.has(transformedTransformedImageId)) {
       return [];
     }
 
-    collected.add(transformedImageId);
+    collected.add(transformedTransformedImageId);
 
     // Get all nested transformed images (children)
     const nestedTransformedImages =
       await this.prismaService.transformedImage.findMany({
         where: {
-          parentId: transformedImageId,
+          parentId: transformedTransformedImageId,
         },
       });
 
-    const allIds = [transformedImageId];
+    const allIds = [transformedTransformedImageId];
 
     // Recursively collect nested transformed images
-    for (const nested of nestedTransformedImages) {
+    for (const nestedTransformedImage of nestedTransformedImages) {
       const nestedIds = await this.collectAllNestedTransformedImages(
-        nested.id,
+        nestedTransformedImage.id,
         collected,
       );
       allIds.push(...nestedIds);
@@ -204,11 +207,7 @@ export class TransformedImagesService {
             id,
           },
           include: {
-            originalImage: {
-              select: {
-                userId: true,
-              },
-            },
+            originalImage: true,
             transformedTransformedImages: true,
           },
         });
@@ -225,18 +224,25 @@ export class TransformedImagesService {
         );
       }
 
-      // Collect all nested transformed image IDs (including the one being deleted)
+      // Collect all nested transformed image IDs (including nested ones)
       const collected = new Set<string>();
-      const allTransformedImageIds =
-        await this.collectAllNestedTransformedImages(id, collected);
+      const allTransformedTransformedImageIds: string[] = [];
 
-      // Fetch all transformed images to get their publicIds, transformations, and parentIds
-      const allTransformedImages =
-        allTransformedImageIds.length > 0
+      for (const transformedTransformedImage of transformedImage.transformedTransformedImages) {
+        const ids = await this.collectAllNestedTransformedImages(
+          transformedTransformedImage.id,
+          collected,
+        );
+        allTransformedTransformedImageIds.push(...ids);
+      }
+
+      // Fetch all transformed transformed images to get their publicIds, transformations, and parentIds
+      const allTransformedTransformedImages =
+        allTransformedTransformedImageIds.length > 0
           ? await this.prismaService.transformedImage.findMany({
               where: {
                 id: {
-                  in: allTransformedImageIds,
+                  in: allTransformedTransformedImageIds,
                 },
               },
               select: {
@@ -248,20 +254,19 @@ export class TransformedImagesService {
             })
           : [];
 
-      // Delete cache entries for all transformed images
-      const cacheDeletePromises = allTransformedImages.map(async (ti) => {
-        try {
-          // Reconstruct the cache key using the stored transformation
-          const transformImageDto =
-            ti.transformation as unknown as TransformImageDto;
+      // Delete cache entries for all transformed transformed images
+      const cacheDeletePromises = allTransformedTransformedImages.map(
+        async (transformedTransformedImage) => {
+          try {
+            // Reconstruct the cache key using the stored transformation
+            const transformImageDto =
+              transformedTransformedImage.transformation as unknown as TransformImageDto;
 
-          // For nested transformed images, the cache key uses the parent's ID
-          // If parentId is null, this is a direct transformation (shouldn't happen in this service)
-          // Otherwise, use the parentId to generate the cache key
-          if (ti.parentId) {
+            // All transformed-transformed images are nested (they have a parentId)
+            // Use the parent transformed image ID that was used when creating the cache key
             const cacheKey = this.generateTransformedTransformedImageCacheKey(
               userId,
-              ti.parentId,
+              transformedTransformedImage.parentId, // Parent ID is the source transformed image ID
               transformImageDto,
             );
 
@@ -271,43 +276,90 @@ export class TransformedImagesService {
             if (cachedValue) {
               await this.cacheManager.del(cacheKey);
             }
+          } catch (error) {
+            console.error(
+              `Failed to delete cache entry for transformed transformed image:`,
+              error,
+            );
+            // Continue even if cache deletion fails
           }
-        } catch (error) {
-          console.error(
-            `Failed to delete cache entry for transformed image:`,
-            error,
-          );
-          // Continue even if cache deletion fails
-        }
-      });
-
-      // Delete all transformed images from Cloudinary in parallel
-      const deletePromises = allTransformedImages.map((ti) =>
-        cloudinary.uploader.destroy(ti.publicId).catch((error) => {
-          console.error(
-            `Failed to delete transformed image with publicId ${ti.publicId} from Cloudinary:`,
-            error,
-          );
-          // Continue even if Cloudinary deletion fails
-        }),
+        },
       );
 
-      // Wait for all cache deletions and Cloudinary deletions to complete (in parallel)
+      // Delete cache entry for the transformed image itself
+      cacheDeletePromises.push(
+        (async () => {
+          try {
+            const transformImageDto =
+              transformedImage.transformation as unknown as TransformImageDto;
+
+            const cacheKey = this.generateTransformedTransformedImageCacheKey(
+              userId,
+              transformedImage.parentId === null
+                ? transformedImage.originalImageId // Use original image ID for direct transformations
+                : transformedImage.parentId, // Use parent ID for nested transformations
+              transformImageDto,
+              transformedImage.parentId !== null, // isNested flag
+            );
+
+            const cachedValue = await this.cacheManager.get(cacheKey);
+            if (cachedValue) {
+              await this.cacheManager.del(cacheKey);
+            }
+          } catch (error) {
+            console.error(
+              `Failed to delete cache entry for transformed image:`,
+              error,
+            );
+            // Continue even if cache deletion fails
+          }
+        })(),
+      );
+
+      // Delete all transformed transformed images from Cloudinary in parallel
+      const deletePromises = allTransformedTransformedImages.map(
+        (transformedTransformedImage) =>
+          cloudinary.uploader
+            .destroy(transformedTransformedImage.publicId)
+            .catch((error) => {
+              console.error(
+                `Failed to delete transformed transformed image with publicId ${transformedTransformedImage.publicId} from Cloudinary:`,
+                error,
+              );
+              // Continue even if Cloudinary deletion fails
+            }),
+      );
+
+      // Also delete the transformed image itself from Cloudinary
+      deletePromises.push(
+        cloudinary.uploader
+          .destroy(transformedImage.publicId)
+          .catch((error) => {
+            console.error(
+              `Failed to delete transformed image ${transformedImage.id} from Cloudinary:`,
+              error,
+            );
+            // Continue with database deletion even if Cloudinary deletion fails
+          }),
+      );
+
+      // Wait for all Cloudinary deletions to complete
       await Promise.all([...cacheDeletePromises, ...deletePromises]);
 
-      // Delete all transformed images from database (including nested ones)
+      // Delete all transformed transformed images from database (including nested ones)
       // We need to delete children first, then parents, to avoid violating the self-relation constraint
-      // Use the already-fetched data to determine deletion order in memory (no additional queries)
-      if (allTransformedImages.length > 0) {
+      if (allTransformedTransformedImages.length > 0) {
         // Build a set of IDs that are parents (have children)
         const parentIds = new Set(
-          allTransformedImages
+          allTransformedTransformedImages
             .map((ti) => ti.parentId)
             .filter((pid): pid is string => pid !== null),
         );
 
         // Delete in batches from bottom-up: keep deleting leaf nodes until all are gone
-        const remainingIds = new Set(allTransformedImages.map((ti) => ti.id));
+        const remainingIds = new Set(
+          allTransformedTransformedImages.map((ti) => ti.id),
+        );
         let hasMoreToDelete = true;
 
         while (hasMoreToDelete && remainingIds.size > 0) {
@@ -330,16 +382,22 @@ export class TransformedImagesService {
             },
           });
 
-          // Remove deleted nodes from remaining set and parentIds set
-          leafNodeIds.forEach((nodeId) => {
-            remainingIds.delete(nodeId);
-            parentIds.delete(nodeId);
+          // Remove deleted IDs from remaining set and parent set
+          leafNodeIds.forEach((id) => {
+            remainingIds.delete(id);
+            parentIds.delete(id);
           });
 
-          // Check if we're done
           hasMoreToDelete = remainingIds.size > 0;
         }
       }
+
+      // Finally, delete the transformed image itself from database
+      await this.prismaService.transformedImage.delete({
+        where: {
+          id,
+        },
+      });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { publicId, originalImage, transformedTransformedImages, ...rest } =
