@@ -60,6 +60,7 @@ export class ImagesService {
     userId: string,
     imageId: string,
     transformImageDto: TransformImageDto,
+    isNested: boolean = false,
   ): string {
     const filteredOptions = Object.fromEntries(
       Object.entries(transformImageDto).filter(
@@ -76,7 +77,9 @@ export class ImagesService {
       .update(JSON.stringify(sortedOptions))
       .digest('hex');
 
-    return `bildtransformator:users:${userId}:transformations:${imageId}-${hash}`;
+    const prefix = isNested ? 'transformed-transformations' : 'transformations';
+
+    return `bildtransformator:users:${userId}:${prefix}:${imageId}-${hash}`;
   }
 
   async uploadImageToCloudinary(image: Express.Multer.File, folder: string) {
@@ -215,14 +218,15 @@ export class ImagesService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return images.map(({ publicId, ...rest }) => ({
         ...rest,
-        transformedImages: rest.transformedImages
-          .filter((ti) => ti.parentId === null) // Filter out nested transformed images
-          .map(
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            ({ publicId, ...rest }) => ({
-              ...rest,
-            }),
-          ),
+        transformedImages:
+          rest.transformedImages
+            .filter((ti) => ti.parentId === null) // Filter out nested transformed images
+            .map(
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              ({ publicId, ...rest }) => ({
+                ...rest,
+              }),
+            ) || [],
       }));
     } catch (error) {
       this.handleError(error, `'fetch images for user with ID ${userId}'`);
@@ -315,10 +319,15 @@ export class ImagesService {
             const transformImageDto =
               transformedImage.transformation as unknown as TransformImageDto;
 
+            // Direct transformation (from original image) - parentId is null
+            // Nested transformation (from transformed image) - parentId is not null
             const cacheKey = this.generateTransformedImageCacheKey(
               userId,
-              transformedImage.id,
+              transformedImage.parentId === null
+                ? id // Use the original imageId for direct transformations
+                : transformedImage.parentId, // Use the parent transformed image ID for nested transformations
               transformImageDto,
+              transformedImage.parentId !== null, // isNested flag
             );
 
             // Check if cache entry exists and delete it
