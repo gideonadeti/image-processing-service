@@ -201,7 +201,7 @@ export class ImagesService {
     }
   }
 
-  async like(userId: string, id: string) {
+  async likeUnlike(userId: string, id: string) {
     try {
       const image = await this.prismaService.image.findUnique({
         where: {

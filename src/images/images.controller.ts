@@ -116,9 +116,9 @@ export class ImagesController {
     return this.imagesService.transform(userId, id, transformImageDto);
   }
 
-  @Post(':id/like')
-  like(@UserId() userId: string, @Param('id') id: string) {
-    return this.imagesService.like(userId, id);
+  @Post(':id/like-unlike')
+  likeUnlike(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.likeUnlike(userId, id);
   }
 
   @Post(':id/download')
