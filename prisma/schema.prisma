@@ -53,6 +53,7 @@ model Image {
   publicId       String
   secureUrl      String
   downloadsCount Int      @default(0)
+  isPublic       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -73,6 +74,7 @@ model TransformedImage {
   transformation  Json
   downloadsCount  Int      @default(0)
   parentId        String?  @db.ObjectId
+  isPublic        Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
