@@ -206,7 +206,6 @@ export class ImagesService {
       const image = await this.prismaService.image.findUnique({
         where: {
           id,
-          userId,
         },
       });
 
