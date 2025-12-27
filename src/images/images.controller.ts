@@ -14,6 +14,7 @@ import {
   UploadedFile,
   ParseFilePipeBuilder,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 
 import { ImagesService } from './images.service';
@@ -124,6 +125,11 @@ export class ImagesController {
   @Post(':id/download')
   download(@UserId() userId: string, @Param('id') id: string) {
     return this.imagesService.download(userId, id);
+  }
+
+  @Patch(':id/toggle-public')
+  togglePublic(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.togglePublic(userId, id);
   }
 
   @Get()

@@ -287,6 +287,40 @@ export class ImagesService {
     }
   }
 
+  async togglePublic(userId: string, id: string) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
+
+      const updatedImage = await this.prismaService.image.update({
+        where: {
+          id,
+          userId,
+        },
+        data: {
+          isPublic: !image.isPublic,
+        },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { publicId, ...rest } = updatedImage;
+
+      return {
+        ...rest,
+      };
+    } catch (error) {
+      this.handleError(error, 'toggle image public status');
+    }
+  }
+
   async findAll(userId: string) {
     try {
       const images = await this.prismaService.image.findMany({
