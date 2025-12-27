@@ -201,6 +201,84 @@ export class ImagesService {
     }
   }
 
+  async like(userId: string, id: string) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
+
+      // Check if like already exists
+      const existingLike = await this.prismaService.like.findUnique({
+        where: {
+          userId_imageId_transformedImageId: {
+            userId,
+            imageId: id,
+            transformedImageId: null,
+          },
+        },
+      });
+
+      if (existingLike) {
+        // Unlike: delete the existing like
+        await this.prismaService.like.delete({
+          where: {
+            id: existingLike.id,
+          },
+        });
+
+        // Unliked
+        return false;
+      }
+
+      // Like: create new like
+      await this.prismaService.like.create({
+        data: {
+          userId,
+          imageId: id,
+        },
+      });
+
+      // Liked
+      return true;
+    } catch (error) {
+      this.handleError(error, 'like image');
+    }
+  }
+
+  async download(userId: string, id: string) {
+    try {
+      const image = await this.prismaService.image.findUnique({
+        where: {
+          id,
+          userId,
+        },
+      });
+
+      if (!image) {
+        throw new BadRequestException('Image not found');
+      }
+
+      await this.prismaService.download.create({
+        data: {
+          userId,
+          imageId: id,
+        },
+      });
+
+      // Success
+      return true;
+    } catch (error) {
+      this.handleError(error, 'download image');
+    }
+  }
+
   async findAll(userId: string) {
     try {
       const images = await this.prismaService.image.findMany({

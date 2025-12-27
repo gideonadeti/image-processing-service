@@ -116,6 +116,16 @@ export class ImagesController {
     return this.imagesService.transform(userId, id, transformImageDto);
   }
 
+  @Post(':id/like')
+  like(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.like(userId, id);
+  }
+
+  @Post(':id/download')
+  download(@UserId() userId: string, @Param('id') id: string) {
+    return this.imagesService.download(userId, id);
+  }
+
   @Get()
   findAll(@UserId() userId: string) {
     return this.imagesService.findAll(userId);
