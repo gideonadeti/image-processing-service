@@ -59,6 +59,9 @@ model Image {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   transformedImages TransformedImage[]
   likes             Like[]
+
+  @@index([userId, createdAt])
+  @@index([userId, id])
 }
 
 model TransformedImage {
@@ -77,6 +80,9 @@ model TransformedImage {
   originalImage                Image              @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
   transformedTransformedImages TransformedImage[] @relation("TransformedImageTree")
   likes                        Like[]
+
+  @@index([parentId])
+  @@index([originalImageId])
 }
 
 model Like {
@@ -92,4 +98,6 @@ model Like {
   transformedImage TransformedImage? @relation(fields: [transformedImageId], references: [id], onDelete: Cascade)
 
   @@unique([userId, imageId, transformedImageId])
+  @@index([userId, imageId])
+  @@index([userId, transformedImageId])
 }
