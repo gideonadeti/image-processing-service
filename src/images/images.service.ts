@@ -227,18 +227,21 @@ export class ImagesService {
 
       if (existingLike) {
         // Unlike: delete the existing like
-        await this.prismaService.like.delete({
+        const like = await this.prismaService.like.delete({
           where: {
             id: existingLike.id,
           },
         });
 
         // Unliked
-        return false;
+        return {
+          ...like,
+          action: 'unliked',
+        };
       }
 
       // Like: create new like
-      await this.prismaService.like.create({
+      const like = await this.prismaService.like.create({
         data: {
           userId,
           imageId: id,
@@ -246,7 +249,10 @@ export class ImagesService {
       });
 
       // Liked
-      return true;
+      return {
+        ...like,
+        action: 'liked',
+      };
     } catch (error) {
       this.handleError(error, 'like image');
     }
@@ -265,10 +271,13 @@ export class ImagesService {
         throw new BadRequestException('Image not found');
       }
 
-      await this.prismaService.download.create({
-        data: {
+      await this.prismaService.image.update({
+        where: {
+          id,
           userId,
-          imageId: id,
+        },
+        data: {
+          downloadsCount: { increment: 1 },
         },
       });
 
