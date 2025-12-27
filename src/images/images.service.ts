@@ -76,13 +76,10 @@ export class ImagesService {
       .update(JSON.stringify(sortedOptions))
       .digest('hex');
 
-    return `${userId}:transformations:${imageId}-${hash}`;
+    return `bildtransformator:users:${userId}:transformations:${imageId}-${hash}`;
   }
 
-  async uploadImageToCloudinary(
-    image: Express.Multer.File,
-    folder = 'Bildtransformator-Images',
-  ) {
+  async uploadImageToCloudinary(image: Express.Multer.File, folder: string) {
     try {
       // Upload from buffer using data URI format for Cloudinary
       const dataUri = `data:${image.mimetype};base64,${image.buffer.toString('base64')}`;
@@ -97,12 +94,12 @@ export class ImagesService {
     } catch (error) {
       this.handleError(
         error,
-        `upload image with original name '${image.originalname}' to folder '${folder}'`,
+        `upload image with original name '${image.originalname}' `,
       );
     }
   }
 
-  async getFileBufferFromCloudinary(secureUrl: string): Promise<Buffer> {
+  async getFileBufferFromCloudinary(secureUrl: string) {
     try {
       const response = await fetch(secureUrl);
 
@@ -124,7 +121,10 @@ export class ImagesService {
     const format = file.mimetype.split('/')[1];
 
     try {
-      const { publicId, secureUrl } = await this.uploadImageToCloudinary(file);
+      const { publicId, secureUrl } = await this.uploadImageToCloudinary(
+        file,
+        `Bildtransformator/users/${userId}/uploaded-images`,
+      );
       const image = await this.prismaService.image.create({
         data: {
           userId,
@@ -364,7 +364,50 @@ export class ImagesService {
       // Wait for all cache deletions and Cloudinary deletions to complete (in parallel)
       await Promise.all([...cacheDeletePromises, ...deletePromises]);
 
-      // Delete from database (cascade will handle all transformed images)
+      // Delete all transformed images from database (including nested ones)
+      // We need to delete children first, then parents, to avoid violating the self-relation constraint
+      // Delete from deepest level up: keep deleting leaf nodes (those with no children) until all are gone
+      let deletedCount = 1;
+      while (deletedCount > 0) {
+        // Find all IDs that are used as parentId (i.e., they have children)
+        const allTransformedImagesForImage =
+          await this.prismaService.transformedImage.findMany({
+            where: {
+              originalImageId: id,
+            },
+            select: {
+              id: true,
+              parentId: true,
+            },
+          });
+
+        // Get set of IDs that are parents (appear as parentId)
+        const parentIds = new Set(
+          allTransformedImagesForImage
+            .map((ti) => ti.parentId)
+            .filter((pid): pid is string => pid !== null),
+        );
+
+        // Delete only leaf nodes (those whose ID is not in parentIds)
+        const leafNodeIds = allTransformedImagesForImage
+          .filter((ti) => !parentIds.has(ti.id))
+          .map((ti) => ti.id);
+
+        if (leafNodeIds.length === 0) {
+          break;
+        }
+
+        const result = await this.prismaService.transformedImage.deleteMany({
+          where: {
+            id: {
+              in: leafNodeIds,
+            },
+          },
+        });
+        deletedCount = result.count;
+      }
+
+      // Delete the original image from database
       await this.prismaService.image.delete({
         where: {
           id,
