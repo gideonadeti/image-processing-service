@@ -133,7 +133,10 @@ export class ImagesProcessor extends WorkerHost {
       } as Express.Multer.File;
 
       const { publicId, secureUrl } =
-        await this.imagesService.uploadImageToCloudinary(expressMulterFile);
+        await this.imagesService.uploadImageToCloudinary(
+          expressMulterFile,
+          `Bildtransformator/users/${image.userId}/transformed-images`,
+        );
 
       const transformedImage = await this.prismaService.transformedImage.create(
         {
