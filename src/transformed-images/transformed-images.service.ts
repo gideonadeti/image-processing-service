@@ -53,7 +53,7 @@ export class TransformedImagesService {
       .update(JSON.stringify(sortedOptions))
       .digest('hex');
 
-    return `${userId}:transformations:${transformedImageId}-${hash}`;
+    return `bildtransformator:users:${userId}:transformed-transformations:${transformedImageId}-${hash}`;
   }
 
   async transform(
