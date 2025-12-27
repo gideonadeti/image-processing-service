@@ -375,45 +375,48 @@ export class ImagesService {
 
       // Delete all transformed images from database (including nested ones)
       // We need to delete children first, then parents, to avoid violating the self-relation constraint
-      // Delete from deepest level up: keep deleting leaf nodes (those with no children) until all are gone
-      let deletedCount = 1;
-      while (deletedCount > 0) {
-        // Find all IDs that are used as parentId (i.e., they have children)
-        const allTransformedImagesForImage =
-          await this.prismaService.transformedImage.findMany({
-            where: {
-              originalImageId: id,
-            },
-            select: {
-              id: true,
-              parentId: true,
-            },
-          });
-
-        // Get set of IDs that are parents (appear as parentId)
+      // Use the already-fetched data to determine deletion order in memory (no additional queries)
+      if (allTransformedImages.length > 0) {
+        // Build a set of IDs that are parents (have children)
         const parentIds = new Set(
-          allTransformedImagesForImage
+          allTransformedImages
             .map((ti) => ti.parentId)
             .filter((pid): pid is string => pid !== null),
         );
 
-        // Delete only leaf nodes (those whose ID is not in parentIds)
-        const leafNodeIds = allTransformedImagesForImage
-          .filter((ti) => !parentIds.has(ti.id))
-          .map((ti) => ti.id);
+        // Delete in batches from bottom-up: keep deleting leaf nodes until all are gone
+        const remainingIds = new Set(allTransformedImages.map((ti) => ti.id));
+        let hasMoreToDelete = true;
 
-        if (leafNodeIds.length === 0) {
-          break;
-        }
+        while (hasMoreToDelete && remainingIds.size > 0) {
+          // Find leaf nodes (those that are not parents and are still remaining)
+          const leafNodeIds = Array.from(remainingIds).filter(
+            (nodeId) => !parentIds.has(nodeId),
+          );
 
-        const result = await this.prismaService.transformedImage.deleteMany({
-          where: {
-            id: {
-              in: leafNodeIds,
+          if (leafNodeIds.length === 0) {
+            // Should not happen, but safety check
+            break;
+          }
+
+          // Delete leaf nodes
+          await this.prismaService.transformedImage.deleteMany({
+            where: {
+              id: {
+                in: leafNodeIds,
+              },
             },
-          },
-        });
-        deletedCount = result.count;
+          });
+
+          // Remove deleted nodes from remaining set and parentIds set
+          leafNodeIds.forEach((nodeId) => {
+            remainingIds.delete(nodeId);
+            parentIds.delete(nodeId);
+          });
+
+          // Check if we're done
+          hasMoreToDelete = remainingIds.size > 0;
+        }
       }
 
       // Delete the original image from database
