@@ -224,32 +224,23 @@ export class ImagesService {
 
       if (existingLike) {
         // Unlike: delete the existing like
-        const like = await this.prismaService.like.delete({
+        await this.prismaService.like.delete({
           where: {
             id: existingLike.id,
           },
         });
-
-        // Unliked
-        return {
-          ...like,
-          action: 'unliked',
-        };
+      } else {
+        // Like: create new like
+        await this.prismaService.like.create({
+          data: {
+            userId,
+            imageId: id,
+          },
+        });
       }
 
-      // Like: create new like
-      const like = await this.prismaService.like.create({
-        data: {
-          userId,
-          imageId: id,
-        },
-      });
-
-      // Liked
-      return {
-        ...like,
-        action: 'liked',
-      };
+      // Success
+      return true;
     } catch (error) {
       this.handleError(error, 'like or unlike image');
     }
@@ -300,7 +291,7 @@ export class ImagesService {
         throw new BadRequestException('Image not found');
       }
 
-      const updatedImage = await this.prismaService.image.update({
+      await this.prismaService.image.update({
         where: {
           id,
           userId,
@@ -310,12 +301,9 @@ export class ImagesService {
         },
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { publicId, ...rest } = updatedImage;
-
-      return {
-        ...rest,
-      };
+      // Success
+      // Because of the optimistic update, we don't need to return the updated image
+      return true;
     } catch (error) {
       this.handleError(error, 'toggle image public status');
     }
