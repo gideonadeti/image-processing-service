@@ -252,17 +252,24 @@ export class ImagesService {
     }
   }
 
-  async download(id: string) {
+  async download(id: string, userId: string) {
     try {
       const image = await this.prismaService.image.findUnique({
         where: {
           id,
-          isPublic: true,
         },
       });
 
       if (!image) {
         throw new BadRequestException('Image not found');
+      }
+
+      // If image is public, any authenticated user can download it
+      // If image is private, only the owner can download it
+      if (!image.isPublic && image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to download this image',
+        );
       }
 
       // For MongoDB, we need to increment the count manually

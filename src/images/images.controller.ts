@@ -21,7 +21,6 @@ import { ImagesService } from './images.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UserId } from 'src/user-id/user-id.decorator';
 import { TransformImageDto } from './dto/transform-image.dto';
-import { Public } from 'src/public/public.decorator';
 
 @ApiTags('Images')
 @ApiBearerAuth()
@@ -123,10 +122,9 @@ export class ImagesController {
     return this.imagesService.likeUnlike(userId, id);
   }
 
-  @Public()
   @Post(':id/download')
-  download(@Param('id') id: string) {
-    return this.imagesService.download(id);
+  download(@Param('id') id: string, @UserId() userId: string) {
+    return this.imagesService.download(id, userId);
   }
 
   @Patch(':id/toggle-public')
@@ -134,7 +132,6 @@ export class ImagesController {
     return this.imagesService.togglePublic(userId, id);
   }
 
-  @Public()
   @Get('public')
   findAllPublic() {
     return this.imagesService.findAllPublic();
