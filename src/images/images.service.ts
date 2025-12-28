@@ -331,7 +331,11 @@ export class ImagesService {
           createdAt: 'desc',
         },
         include: {
-          transformedImages: true,
+          transformedImages: {
+            include: {
+              likes: true,
+            },
+          },
           likes: true,
         },
       });
