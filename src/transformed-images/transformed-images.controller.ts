@@ -9,6 +9,7 @@ import {
   Post,
   Body,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 
 import { TransformedImagesService } from './transformed-images.service';
@@ -91,6 +92,26 @@ export class TransformedImagesController {
       id,
       transformImageDto,
     );
+  }
+
+  @Post(':id/like-unlike')
+  likeUnlike(@UserId() userId: string, @Param('id') id: string) {
+    return this.transformedImagesService.likeUnlike(userId, id);
+  }
+
+  @Post(':id/download')
+  download(@Param('id') id: string, @UserId() userId: string) {
+    return this.transformedImagesService.download(id, userId);
+  }
+
+  @Patch(':id/toggle-public')
+  togglePublic(@UserId() userId: string, @Param('id') id: string) {
+    return this.transformedImagesService.togglePublic(userId, id);
+  }
+
+  @Get(':id/public')
+  findOnePublic(@Param('id') id: string) {
+    return this.transformedImagesService.findOnePublic(id);
   }
 
   @Get(':id')

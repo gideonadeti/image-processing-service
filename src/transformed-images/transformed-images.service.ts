@@ -11,6 +11,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -27,9 +28,11 @@ export class TransformedImagesService {
   private handleError(error: any, action: string) {
     console.error(`Failed to ${action}:`, error);
 
-    if (error instanceof BadRequestException) {
-      throw error;
-    } else if (error instanceof ForbiddenException) {
+    if (
+      error instanceof BadRequestException ||
+      error instanceof NotFoundException ||
+      error instanceof ForbiddenException
+    ) {
       throw error;
     }
 
@@ -119,6 +122,194 @@ export class TransformedImagesService {
       this.handleError(error, 'transform transformed image');
     }
   }
+  async likeUnlike(userId: string, id: string) {
+    try {
+      const transformedImage =
+        await this.prismaService.transformedImage.findUnique({
+          where: {
+            id,
+          },
+          include: {
+            originalImage: true,
+          },
+        });
+
+      if (!transformedImage) {
+        throw new BadRequestException('Transformed image not found');
+      }
+
+      // If transformed image is private, only the owner can like/unlike it
+      if (
+        !transformedImage.isPublic &&
+        transformedImage.originalImage.userId !== userId
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to like/unlike this private transformed image',
+        );
+      }
+
+      // Check if like already exists
+      const existingLike = await this.prismaService.like.findFirst({
+        where: {
+          userId,
+          transformedImageId: id,
+        },
+      });
+
+      if (existingLike) {
+        // Unlike: delete the existing like
+        await this.prismaService.like.delete({
+          where: {
+            id: existingLike.id,
+          },
+        });
+      } else {
+        // Like: create new like
+        await this.prismaService.like.create({
+          data: {
+            userId,
+            transformedImageId: id,
+          },
+        });
+      }
+
+      // Success
+      return true;
+    } catch (error) {
+      this.handleError(error, 'like or unlike transformed image');
+    }
+  }
+
+  async download(id: string, userId: string) {
+    try {
+      const transformedImage =
+        await this.prismaService.transformedImage.findUnique({
+          where: {
+            id,
+          },
+          include: {
+            originalImage: true,
+          },
+        });
+
+      if (!transformedImage) {
+        throw new BadRequestException('Transformed image not found');
+      }
+
+      // If transformed image is public, any authenticated user can download it
+      // If transformed image is private, only the owner can download it
+      if (
+        !transformedImage.isPublic &&
+        transformedImage.originalImage.userId !== userId
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to download this transformed image',
+        );
+      }
+
+      // For MongoDB, we need to increment the count manually
+      // Prisma's increment might not work reliably with MongoDB
+      await this.prismaService.transformedImage.update({
+        where: {
+          id,
+        },
+        data: {
+          downloadsCount: (transformedImage.downloadsCount ?? 0) + 1,
+        },
+      });
+
+      // Success
+      return true;
+    } catch (error) {
+      this.handleError(error, 'download transformed image');
+    }
+  }
+
+  async togglePublic(userId: string, id: string) {
+    try {
+      const transformedImage =
+        await this.prismaService.transformedImage.findUnique({
+          where: {
+            id,
+          },
+          include: {
+            originalImage: true,
+          },
+        });
+
+      if (!transformedImage) {
+        throw new BadRequestException('Transformed image not found');
+      }
+
+      if (transformedImage.originalImage.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to toggle public status of this transformed image',
+        );
+      }
+
+      await this.prismaService.transformedImage.update({
+        where: {
+          id,
+        },
+        data: {
+          isPublic: !transformedImage.isPublic,
+        },
+      });
+
+      // Success
+      return true;
+    } catch (error) {
+      this.handleError(error, 'toggle transformed image public status');
+    }
+  }
+
+  async findOnePublic(id: string) {
+    try {
+      const transformedImage =
+        await this.prismaService.transformedImage.findUnique({
+          where: {
+            id,
+            isPublic: true,
+          },
+          include: {
+            transformedTransformedImages: {
+              where: {
+                isPublic: true,
+              },
+            },
+            originalImage: {
+              select: {
+                originalName: true,
+                userId: true,
+              },
+            },
+            likes: true,
+          },
+        });
+
+      if (!transformedImage) {
+        throw new NotFoundException(
+          `Public transformed image with ID ${id} not found`,
+        );
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { publicId, ...rest } = transformedImage;
+
+      return {
+        ...rest,
+        transformedTransformedImages:
+          transformedImage.transformedTransformedImages.map(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            ({ publicId, ...rest }) => ({
+              ...rest,
+            }),
+          ),
+      };
+    } catch (error) {
+      this.handleError(error, `fetch public transformed image with ID ${id}`);
+    }
+  }
 
   async findOne(userId: string, id: string) {
     try {
@@ -133,7 +324,12 @@ export class TransformedImagesService {
                 userId: true,
               },
             },
-            transformedTransformedImages: true,
+            transformedTransformedImages: {
+              include: {
+                likes: true,
+              },
+            },
+            likes: true,
           },
         });
 
