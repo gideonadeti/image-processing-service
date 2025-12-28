@@ -213,6 +213,13 @@ export class ImagesService {
         throw new BadRequestException('Image not found');
       }
 
+      // If image is private, only the owner can like/unlike it
+      if (!image.isPublic && image.userId !== userId) {
+        throw new ForbiddenException(
+          'You are not authorized to like/unlike this private image',
+        );
+      }
+
       // Check if like already exists
       const existingLike = await this.prismaService.like.findFirst({
         where: {
