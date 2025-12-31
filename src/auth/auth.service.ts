@@ -375,4 +375,99 @@ export class AuthService {
       this.handleError(error, 'delete account');
     }
   }
+
+  async getStats(userId: string) {
+    try {
+      // Get all images for the user
+      const images = await this.prismaService.image.findMany({
+        where: {
+          userId,
+        },
+        include: {
+          likes: true,
+        },
+      });
+
+      // Get all transformed images (including nested) for user's images
+      const imageIds = images.map((img) => img.id);
+      const transformedImages =
+        await this.prismaService.transformedImage.findMany({
+          where: {
+            originalImageId: {
+              in: imageIds,
+            },
+          },
+          include: {
+            likes: true,
+          },
+        });
+
+      // Calculate image stats
+      const privateImages = images.filter((img) => !img.isPublic).length;
+      const publicImages = images.filter((img) => img.isPublic).length;
+
+      // Calculate transformation stats
+      const privateTransformations = transformedImages.filter(
+        (ti) => !ti.isPublic,
+      ).length;
+
+      const publicTransformations = transformedImages.filter(
+        (ti) => ti.isPublic,
+      ).length;
+
+      // Calculate downloads stats
+      const imageDownloads = images.reduce(
+        (sum, img) => sum + img.downloadsCount,
+        0,
+      );
+
+      const transformedImageDownloads = transformedImages.reduce(
+        (sum, ti) => sum + ti.downloadsCount,
+        0,
+      );
+
+      // Calculate likes stats
+      const imageLikes = images.reduce((sum, img) => sum + img.likes.length, 0);
+      const transformedImageLikes = transformedImages.reduce(
+        (sum, ti) => sum + ti.likes.length,
+        0,
+      );
+
+      // Calculate storage stats
+      const imageStorage = images.reduce((sum, img) => sum + img.size, 0);
+      const transformedImageStorage = transformedImages.reduce(
+        (sum, ti) => sum + ti.size,
+        0,
+      );
+
+      return {
+        images: {
+          private: privateImages,
+          public: publicImages,
+        },
+        transformations: {
+          private: privateTransformations,
+          public: publicTransformations,
+        },
+        downloads: {
+          images: imageDownloads,
+          transformations: transformedImageDownloads,
+        },
+        likes: {
+          images: imageLikes,
+          transformations: transformedImageLikes,
+        },
+        storage: {
+          images: imageStorage,
+          transformations: transformedImageStorage,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get stats for user with ID ${userId}:`,
+        error,
+      );
+      throw new InternalServerErrorException('Failed to get user statistics');
+    }
+  }
 }
