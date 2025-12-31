@@ -42,8 +42,6 @@ export class ImagesService {
     });
   }
 
-  private readonly baseUrl = this.configService.get<string>('BASE_URL');
-
   private handleError(error: any, action: string) {
     console.error(`Failed to ${action}:`, error);
 
