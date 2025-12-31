@@ -370,6 +370,9 @@ export class ImagesService {
             where: {
               isPublic: true,
             },
+            include: {
+              likes: true,
+            },
           },
           likes: true,
         },
