@@ -2,6 +2,8 @@
 
 A robust RESTful API built with NestJS for managing image uploads, transformations, and social interactions. This backend service powers the [Bildtransformator](https://github.com/gideonadeti/bildtransformator) frontend application—a full-featured image processing platform that combines cloud storage capabilities (like Google Photos), image transformation features (like Cloudinary), and social media functionality (like Instagram).
 
+[Live Demo](https://bildtransformator.vercel.app) | [Video Walkthrough](https://youtu.be/zbXT1eRk1l4)
+
 ## Table of Contents
 
 - [Bildtransformator API](#bildtransformator-api)
