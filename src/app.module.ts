@@ -18,6 +18,7 @@ import { JobsModule } from './jobs/jobs.module';
     ImagesModule,
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
     }),
     TransformedImagesModule,
     ThrottlerModule.forRoot({
