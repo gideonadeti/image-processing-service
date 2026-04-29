@@ -196,6 +196,18 @@ Prisma reads `DATABASE_URL` from `.env` (so Installation Steps will copy `.env.l
 
    (Alternatively, run MongoDB/Redis using your system packages.)
 
+   Initialize MongoDB replica set once (required by Prisma transactions):
+
+   ```bash
+   # If you previously started mongodb with auth/without replica set,
+   # reset local mongo volume once:
+   # docker compose --env-file .env.local -f compose.local.yaml down -v
+
+   docker compose --env-file .env.local -f compose.local.yaml exec mongodb \
+     mongosh --quiet \
+       --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+   ```
+
 5. **Set up the database**
 
    ```bash
