@@ -154,89 +154,68 @@ For screenshots, please visit the [Bildtransformator repository](https://github.
 ### Prerequisites
 
 - Node.js (v22 or higher)
-- MongoDB database
-- Redis server
+- MongoDB (running on `localhost:27017` or via Docker)
+- Redis (running on `localhost:6379` or via Docker)
 - Cloudinary account (for image storage)
-- Bun package manager (recommended) - alternatives like npm, yarn, or pnpm also work
 - Email service credentials (for password reset functionality)
+- pnpm package manager (recommended; alternatives like `npm` or `yarn` also work)
 
 ### Environment Variables
 
-Create a `.env` file in the root directory with the following variables:
+Copy `.env.local.example` to `.env.local` and update the values for your local setup.
 
-```env
-# Database
-DATABASE_URL="mongodb://user:password@localhost:27017/bildtransformator?authSource=admin"
-
-# JWT Secrets
-JWT_ACCESS_SECRET="your-access-secret-key"
-JWT_REFRESH_SECRET="your-refresh-secret-key"
-
-# Frontend Configuration
-FRONTEND_BASE_URL="http://localhost:3001"
-
-# Redis Configuration
-REDIS_HOST="localhost"
-REDIS_PORT=6379
-REDIS_USERNAME=""
-REDIS_PASSWORD=""
-
-# Cloudinary Configuration
-CLOUDINARY_CLOUD_NAME="your-cloudinary-cloud-name"
-CLOUDINARY_API_KEY="your-cloudinary-api-key"
-CLOUDINARY_API_SECRET="your-cloudinary-api-secret"
-
-# Email Configuration (Optional - for password reset)
-GOOGLE_APP_PASSWORD="your-google-app-password"
-
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-```
+Prisma reads `DATABASE_URL` from `.env` (so Installation Steps will copy `.env.local` to `.env` before running `prisma`).
 
 ### Installation Steps
 
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/gideonadeti/image-processing-service.git
    cd image-processing-service
    ```
 
 2. **Install dependencies**
 
    ```bash
-   bun install
+   pnpm install
    ```
 
-3. **Set up the database**
+3. **Create your local `.env.local`**
 
    ```bash
+   cp .env.local.example .env.local
+   ```
+
+4. **Start infrastructure services (MongoDB, Redis)**
+
+   ```bash
+   # Recommended: start infra only via Docker Compose
+   docker compose --env-file .env.local -f compose.local.yaml up -d mongodb redis
+   ```
+
+   (Alternatively, run MongoDB/Redis using your system packages.)
+
+5. **Set up the database**
+
+   ```bash
+   # Prisma CLI reads `.env` by default
+   cp .env.local .env
+
    # Push schema to database and generate Prisma Client
    # Note: MongoDB doesn't support migrations, so we use db push instead
-   npx prisma db push
+   pnpm exec prisma db push
    ```
 
    This command will push your Prisma schema to the MongoDB database and automatically generate the Prisma Client.
 
-4. **Start Redis server**
+6. **Start the development server**
 
    ```bash
-   # Using Docker
-   docker run -d -p 6379:6379 redis:latest
-   
-   # Or using your system's package manager
-   # Ubuntu/Debian: sudo apt-get install redis-server
-   # macOS: brew install redis
+   pnpm start:dev
    ```
 
-5. **Start the development server**
-
-   ```bash
-   bun run start:dev
-   ```
-
-6. **Access the API**
+7. **Access the API**
    - API Base URL: `http://localhost:3000/api/v1`
    - Swagger Documentation: `http://localhost:3000/api/v1/documentation`
 
@@ -255,16 +234,16 @@ This project is deployed on [Vercel](https://vercel.com/). To deploy your own in
      Set the build command to generate the Prisma client before building NestJS, for example:  
 
      ```bash
-     bunx prisma generate && bunx nest build
+     pnpm exec prisma generate && pnpm build
      ```
 
    - **Output Directory:**  
      Set the output directory to `dist`.
    - **Install Command:**  
-     Set the install command to use Bun (recommended):  
+     Set the install command to use pnpm (recommended):  
 
      ```bash
-     bun install
+     pnpm install
      ```
 
 3. **Add Environment Variables**
